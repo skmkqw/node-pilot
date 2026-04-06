@@ -1,12 +1,16 @@
+using NodePilot.Api;
+using NodePilot.Application;
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services
+    .AddApplication()
+    .AddPresentation();
 
 var app = builder.Build();
 
-app.UseHttpsRedirection();
+app.MapControllers();
 
-app.MapGet("/", () =>
-{
-    return "OK";
-});
+app.MapGet("/", () => "OK");
 
 app.Run();
