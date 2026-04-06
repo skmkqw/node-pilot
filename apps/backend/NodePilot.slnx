@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/NodePilot.Api/NodePilot.Api.csproj" />
+    <Project Path="src/NodePilot.Application/NodePilot.Application.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/NodePilot.Api.Tests/NodePilot.Api.Tests.csproj" />

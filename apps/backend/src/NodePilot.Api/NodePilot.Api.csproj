@@ -10,4 +10,8 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.4" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\NodePilot.Application\NodePilot.Application.csproj" />
+  </ItemGroup>
+
 </Project>
