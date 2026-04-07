@@ -1,0 +1,82 @@
+{
+	"info": {
+		"_postman_id": "910de772-76d0-4330-81f7-0d67c8dcae0a",
+		"name": "SystemStatus",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "34323364"
+	},
+	"item": [
+		{
+			"name": "GetSystemStatus",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test(\"Response is JSON\", function () {",
+							"    pm.response.to.be.json;",
+							"});",
+							"",
+							"const json = pm.response.json();",
+							"",
+							"pm.test(\"Contains required fields\", function () {",
+							"    pm.expect(json).to.have.property(\"cpuUsagePercent\");",
+							"    pm.expect(json).to.have.property(\"ramUsagePercent\");",
+							"    pm.expect(json).to.have.property(\"totalMemoryBytes\");",
+							"    pm.expect(json).to.have.property(\"usedMemoryBytes\");",
+							"    pm.expect(json).to.have.property(\"availableMemoryBytes\");",
+							"    pm.expect(json).to.have.property(\"collectedAtUtc\");",
+							"});",
+							"",
+							"pm.test(\"CPU and RAM usage are valid percentages\", function () {",
+							"    pm.expect(json.cpuUsagePercent).to.be.a(\"number\");",
+							"    pm.expect(json.cpuUsagePercent).to.be.within(0, 100);",
+							"",
+							"    pm.expect(json.ramUsagePercent).to.be.a(\"number\");",
+							"    pm.expect(json.ramUsagePercent).to.be.within(0, 100);",
+							"});",
+							"",
+							"pm.test(\"Memory values are valid\", function () {",
+							"    pm.expect(json.totalMemoryBytes).to.be.a(\"number\");",
+							"    pm.expect(json.usedMemoryBytes).to.be.a(\"number\");",
+							"    pm.expect(json.availableMemoryBytes).to.be.a(\"number\");",
+							"",
+							"    pm.expect(json.totalMemoryBytes).to.be.above(0);",
+							"    pm.expect(json.usedMemoryBytes).to.be.at.least(0);",
+							"    pm.expect(json.availableMemoryBytes).to.be.at.least(0);",
+							"    pm.expect(json.usedMemoryBytes + json.availableMemoryBytes).to.be.at.most(json.totalMemoryBytes + 1);",
+							"});",
+							"",
+							"pm.test(\"Timestamp is a valid datetime\", function () {",
+							"    pm.expect(Date.parse(json.collectedAtUtc)).to.not.equal(NaN);",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {},
+						"requests": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/system/status",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"system",
+						"status"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
