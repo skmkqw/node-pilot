@@ -75,11 +75,19 @@ By default, the API will be available at:
 http://localhost:5000
 ```
 
-Test endpoint:
+
+Health check endpoint:
 
 ```text
-GET /
+GET /health
 ```
+
+- `/health` runs the backend `system_status` health check and returns a JSON response with the overall health status, execution timing, and per-check details.
+- The current `SystemHealthCheck` is a lightweight server-level probe that reports runtime metadata such as `.NET` version, processor count, and operating system details.
+
+Typical use:
+
+- Use `/health` for local verification, basic uptime monitoring, or a simple orchestrator probe when one combined endpoint is sufficient.
 
 ### 2. Start the Web App (Next.js)
 
@@ -102,5 +110,5 @@ http://localhost:3000
 After setup, confirm that:
 
 - The backend runs without errors
-- `http://localhost:5000/` returns `"OK"`
+- `http://localhost:5000/health` returns a healthy JSON response
 - The frontend loads at `http://localhost:3000`
