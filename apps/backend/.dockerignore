@@ -1,0 +1,8 @@
+bin
+obj
+.git
+.vs
+TestResults
+tests
+**/bin
+**/obj
