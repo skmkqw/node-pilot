@@ -8,6 +8,20 @@ public static class DependencyInjection
     {
         services.AddControllers();
 
+        services.AddCors(options =>
+        {
+            options.AddPolicy("WebClient", policy =>
+            {
+                policy
+                    .WithOrigins(
+                        "http://localhost:3000",
+                        "http://192.168.1.20:3000"
+                    )
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+            });
+        });
+
         services.AddHealthChecks()
             .AddCheck<SystemHealthCheck>(
                 "system_status",
