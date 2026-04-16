@@ -11,6 +11,8 @@ builder.Services
 
 var app = builder.Build();
 
+app.UseCors("WebClient");
+
 app.MapControllers();
 
 app.MapHealthChecks("/health", new HealthCheckOptions
