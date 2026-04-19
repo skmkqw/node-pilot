@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using NodePilot.Application.SystemStatus;
 
 namespace NodePilot.Infrastructure.Persistence.Configurations;
 
@@ -8,9 +9,9 @@ public class SystemMetricsConfigurations : IEntityTypeConfiguration<SystemMetric
     [Obsolete]
     public void Configure(EntityTypeBuilder<SystemMetric> builder)
     {
-        builder.ToTable("system_builders");
+        builder.ToTable("system_metrics");
 
-        // Primary Key
+        // Primary key
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Id)
@@ -20,25 +21,61 @@ public class SystemMetricsConfigurations : IEntityTypeConfiguration<SystemMetric
         builder.Property(x => x.CollectedAtUtc)
             .IsRequired();
 
+        // Metrics read status
+        builder.Property(x => x.Status)
+            .HasConversion<int>()
+            .IsRequired();
+
+        // RAM usage 
+        builder.Property(x => x.CpuUsagePercent);
+
+        // CPU usage 
+        builder.Property(x => x.RamUsagePercent);
+
+        // Failure Reason
+        builder.Property(x => x.FailureReason)
+            .HasMaxLength(500);
+        
+        // Timestamp Index
         builder.HasIndex(x => x.CollectedAtUtc)
             .HasDatabaseName("ix_system_metrics_collected_at_utc");
 
-        // CPU Usage
-        builder.Property(x => x.CpuUsagePercent)
-            .IsRequired();
+        // Status + Timestamp Index
+        builder.HasIndex(x => new { x.Status, x.CollectedAtUtc })
+            .HasDatabaseName("ix_system_metrics_status_collected_at_utc");
 
-        // RAM Usage
-        builder.Property(x => x.RamUsagePercent)
-            .IsRequired();
-
-        // CPU load between 0 and 100 %
+        // RAM load is NULL OR between 0 and 100 %
         builder.HasCheckConstraint(
             "ck_system_metrics_cpu_usage_percent_range",
-            "cpu_usage_percent >= 0 AND cpu_usage_percent <= 100");
-        
-        // RAM load between 0 and 100 %
+            "cpu_usage_percent IS NULL OR (cpu_usage_percent >= 0 AND cpu_usage_percent <= 100)");
+
+        // RAM load is NULL OR between 0 and 100 %
         builder.HasCheckConstraint(
             "ck_system_metrics_ram_usage_percent_range",
-            "ram_usage_percent >= 0 AND ram_usage_percent <= 100");
+            "ram_usage_percent IS NULL OR (ram_usage_percent >= 0 AND ram_usage_percent <= 100)");
+
+        // Valid Success Shape
+        builder.HasCheckConstraint(
+            "ck_system_metrics_success_shape",
+            "(" +
+            "status != 0 OR " +
+            "(" +
+            "cpu_usage_percent IS NOT NULL AND " +
+            "ram_usage_percent IS NOT NULL AND " +
+            "failure_reason IS NULL" +
+            ")" +
+            ")");
+
+        // Valid Fail Shape
+        builder.HasCheckConstraint(
+            "ck_system_metrics_read_failed_shape",
+            "(" +
+            "status != 1 OR " +
+            "(" +
+            "cpu_usage_percent IS NULL AND " +
+            "ram_usage_percent IS NULL AND " +
+            "failure_reason IS NOT NULL" +
+            ")" +
+            ")");
     }
 }
