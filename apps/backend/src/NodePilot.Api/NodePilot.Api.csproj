@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\NodePilot.Application\NodePilot.Application.csproj" />
+    <ProjectReference Include="..\NodePilot.Infrastructure\NodePilot.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
