@@ -4,7 +4,7 @@ using NodePilot.Application.SystemStatus;
 
 namespace NodePilot.Infrastructure.Persistence.Configurations;
 
-public class SystemMetricsConfigurations : IEntityTypeConfiguration<SystemMetric>
+public class SystemMetricsConfiguration : IEntityTypeConfiguration<SystemMetric>
 {
     [Obsolete]
     public void Configure(EntityTypeBuilder<SystemMetric> builder)
@@ -15,27 +15,33 @@ public class SystemMetricsConfigurations : IEntityTypeConfiguration<SystemMetric
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Id)
+            .HasColumnName("id")
             .ValueGeneratedOnAdd();
 
         // Timestamp
         builder.Property(x => x.CollectedAtUtc)
+            .HasColumnName("collected_at_utc")
             .IsRequired();
 
         // Metrics read status
         builder.Property(x => x.Status)
+            .HasColumnName("status")
             .HasConversion<int>()
             .IsRequired();
 
         // RAM usage 
-        builder.Property(x => x.CpuUsagePercent);
+        builder.Property(x => x.CpuUsagePercent)
+            .HasColumnName("cpu_usage_percent");
 
         // CPU usage 
-        builder.Property(x => x.RamUsagePercent);
+        builder.Property(x => x.RamUsagePercent)
+            .HasColumnName("ram_usage_percent");
 
         // Failure Reason
         builder.Property(x => x.FailureReason)
+            .HasColumnName("failure_reason")
             .HasMaxLength(500);
-        
+
         // Timestamp Index
         builder.HasIndex(x => x.CollectedAtUtc)
             .HasDatabaseName("ix_system_metrics_collected_at_utc");
