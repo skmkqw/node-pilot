@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NodePilot.Application.SystemStatus;
 
 namespace NodePilot.Infrastructure.Persistence;
 
