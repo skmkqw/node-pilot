@@ -1,22 +1,22 @@
 using Microsoft.AspNetCore.Mvc;
-using NodePilot.Application.SystemStatus.Services;
+using NodePilot.Application.Interfaces.SystemStatus;
 
 namespace NodePilot.Api.Controllers;
 
 [Route("api/[controller]")]
 public class SystemController : BaseController
 {
-    private readonly ISystemStatusService _systemStatusService;
+    private readonly ISystemMetricsReader _systemMetricsReader;
 
-    public SystemController(ISystemStatusService systemStatusService)
+    public SystemController(ISystemMetricsReader metricsReader)
     {
-        _systemStatusService = systemStatusService;
+        _systemMetricsReader = metricsReader;
     }
 
     [HttpGet("status")]
-    public async Task<IActionResult> GetSystemStatus()
+    public async Task<IActionResult> GetSystemStatus(CancellationToken ct = default)
     {
-        var getSystemStatusResult = await _systemStatusService.GetSystemStatusAsync();
+        var getSystemStatusResult = await _systemMetricsReader.ReadSystemStatusAsync(ct);
 
         return getSystemStatusResult.Match(onValue: Ok, onError: Problem);
     }
