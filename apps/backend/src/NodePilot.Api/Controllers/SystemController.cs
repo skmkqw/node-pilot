@@ -6,18 +6,30 @@ namespace NodePilot.Api.Controllers;
 [Route("api/[controller]")]
 public class SystemController : BaseController
 {
-    private readonly ISystemMetricsReader _systemMetricsReader;
+    private readonly ISystemMetricsProvider _metricsProvider;
 
-    public SystemController(ISystemMetricsReader metricsReader)
+    public SystemController(ISystemMetricsProvider metricsProvider)
     {
-        _systemMetricsReader = metricsReader;
+        _metricsProvider = metricsProvider;
     }
 
-    [HttpGet("status")]
-    public async Task<IActionResult> GetSystemStatus(CancellationToken ct = default)
+    [HttpGet("metrics/current")]
+    public async Task<IActionResult> GetCurrentMetrics(CancellationToken ct = default)
     {
-        var getSystemStatusResult = await _systemMetricsReader.ReadSystemStatusAsync(ct);
+        var getCurrentMetricsResult = await _metricsProvider.GetCurrentMetricsAsync(ct);
 
-        return getSystemStatusResult.Match(onValue: Ok, onError: Problem);
+        return getCurrentMetricsResult.Match(onValue: Ok, onError: Problem);
+    }
+
+    [HttpGet("metrics/historical")]
+    public async Task<IActionResult> GetHistoricalMetrics([FromQuery] DateTime start,
+        [FromQuery] DateTime end,
+        [FromQuery] int? minIntervalSeconds,
+        CancellationToken ct = default)
+    {
+        var getHistoricalMetricsResult =
+            await _metricsProvider.GetHistoricalMetricsAsync(start, end, minIntervalSeconds, ct);
+
+        return getHistoricalMetricsResult.Match(onValue: Ok, onError: Problem);
     }
 }

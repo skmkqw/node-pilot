@@ -12,7 +12,7 @@ public sealed class SystemMetric
 
     public string? FailureReason { get; init; }
     
-    public DateTimeOffset CollectedAtUtc { get; init; }
+    public DateTime CollectedAtUtc { get; init; }
 }
 
 public enum MetricCollectionStatus
