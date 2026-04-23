@@ -18,7 +18,7 @@ public sealed class LinuxSystemMetricsCollector : ISystemMetricsCollector
 
     public async Task<SystemMetric> CollectAsync(CancellationToken cancellationToken = default)
     {
-        var collectedAtUtc = DateTimeOffset.UtcNow;
+        var collectedAtUtc = DateTime.UtcNow;
 
         var readSystemMetricsResult = await _metricsReader.ReadSystemStatusAsync(cancellationToken);
 
@@ -41,7 +41,7 @@ public sealed class LinuxSystemMetricsCollector : ISystemMetricsCollector
         };
     }
 
-    private SystemMetric CreateReadFailedMetric(DateTimeOffset collectedAtUtc, string failureReason)
+    private SystemMetric CreateReadFailedMetric(DateTime collectedAtUtc, string failureReason)
     {
         _logger.LogWarning(
             "System metrics collection failed at {CollectedAtUtc}. Reason: {FailureReason}",
