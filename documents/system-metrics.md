@@ -84,6 +84,122 @@ The database enforces the expected row shape:
 - failed rows must have no CPU or RAM values and must have a failure reason
 - CPU and RAM percentages must be `NULL` or within `0..100`
 
+## Metrics API endpoints
+
+The persisted metrics API is exposed by `SystemController` under:
+
+```http
+/api/system/metrics
+```
+
+### Get current metrics
+
+Returns the latest successful persisted metrics sample.
+
+```http
+GET /api/system/metrics/current
+```
+
+Example:
+
+```bash
+curl http://localhost:5000/api/system/metrics/current
+```
+
+Example response:
+
+```json
+{
+  "id": 104,
+  "cpuUsagePercent": 12.58,
+  "ramUsagePercent": 71.44,
+  "status": "Success",
+  "failureReason": null,
+  "collectedAtUtc": "2026-04-23T14:03:15.123Z"
+}
+```
+
+Responses:
+
+- `200 OK`: Latest successful sample was found.
+- `404 Not Found`: No successful samples are available yet.
+
+### Get historical metrics
+
+Returns persisted metrics samples collected between `start` and `end`, ordered by `collectedAtUtc` ascending.
+
+```http
+GET /api/system/metrics/historical?start={startUtc}&end={endUtc}&minIntervalSeconds={seconds}
+```
+
+Query parameters:
+
+- `start`: Required start timestamp. Must be earlier than `end` and cannot be in the future.
+- `end`: Required end timestamp. If it is in the future, it is normalized to the current UTC time.
+- `minIntervalSeconds`: Optional downsampling interval. When supplied, it must be at least `5`.
+
+Constraints:
+
+- The requested range cannot exceed 7 days.
+- Historical results include both successful and failed samples.
+- Use ISO 8601 timestamps. UTC timestamps with `Z` are recommended.
+
+Example:
+
+```bash
+curl "http://localhost:5212/api/system/metrics/historical?start=2026-04-23T12:00:00Z&end=2026-04-23T13:00:00Z"
+```
+
+Example with downsampling:
+
+```bash
+curl "http://localhost:5212/api/system/metrics/historical?start=2026-04-23T12:00:00Z&end=2026-04-23T13:00:00Z&minIntervalSeconds=60"
+```
+
+Example response:
+
+```json
+[
+  {
+    "id": 100,
+    "cpuUsagePercent": 10.15,
+    "ramUsagePercent": 69.82,
+    "status": "Success",
+    "failureReason": null,
+    "collectedAtUtc": "2026-04-23T12:00:00.000Z"
+  },
+  {
+    "id": 101,
+    "cpuUsagePercent": null,
+    "ramUsagePercent": null,
+    "status": "ReadFailed",
+    "failureReason": "SystemStatus.PlatformNotSupported",
+    "collectedAtUtc": "2026-04-23T12:00:05.000Z"
+  }
+]
+```
+
+Responses:
+
+- `200 OK`: Query succeeded. The body may be an empty array if no samples exist in the range.
+- `400 Bad Request`: Query validation failed.
+
+Validation errors:
+
+- `SystemMetrics.History.InvalidRange`: `start` is not earlier than `end`.
+- `SystemMetrics.History.StartInFuture`: `start` is in the future.
+- `SystemMetrics.History.RangeTooLarge`: Requested range is greater than 7 days.
+- `SystemMetrics.History.InvalidInterval`: `minIntervalSeconds` is less than 5.
+
+### API usage notes
+
+For dashboards, call `GET /api/system/metrics/current` for the most recent point and periodically refresh it.
+For charts, call `GET /api/system/metrics/historical` with a bounded time window.
+
+Use `minIntervalSeconds` when rendering longer ranges to reduce payload size. For example, a 1-hour chart can request one point every 60 seconds, while a short live chart can omit downsampling to use the raw 5-second samples.
+
+Because sampling runs in the background, a newly started application may briefly return `404` for current metrics until the first successful Linux sample is persisted.
+
 ## CPU metrics
 
 ### Source
@@ -217,11 +333,13 @@ For background persistence, `LinuxSystemMetricsCollector` converts those errors 
 - `apps/backend/src/NodePilot.Api/Controllers/SystemController.cs`
 - `apps/backend/src/NodePilot.Application/SystemStatus/Services/SystemMetricsReader.cs`
 - `apps/backend/src/NodePilot.Application/SystemStatus/Services/SystemMetricsCollector.cs`
+- `apps/backend/src/NodePilot.Application/SystemStatus/Services/SystemMetricsProvider.cs`
 - `apps/backend/src/NodePilot.Application/SystemStatus/SystemStatus.cs`
 - `apps/backend/src/NodePilot.Application/SystemStatus/SystemMetric.cs`
 - `apps/backend/src/NodePilot.Application/SystemStatus/Errors/SystemStatusErrors.cs`
 - `apps/backend/src/NodePilot.Application/Interfaces/SystemStatus/ISystemMetricsReader.cs`
 - `apps/backend/src/NodePilot.Application/Interfaces/SystemStatus/ISystemMetricsCollector.cs`
+- `apps/backend/src/NodePilot.Application/Interfaces/SystemStatus/ISystemMetricsProvider.cs`
 - `apps/backend/src/NodePilot.Application/Interfaces/SystemStatus/ISystemMetricsRepository.cs`
 - `apps/backend/src/NodePilot.Infrastructure/Background/MetricsSamplingBackgroundService.cs`
 - `apps/backend/src/NodePilot.Infrastructure/Persistence/Repositories/SystemMetricsRepository.cs`
