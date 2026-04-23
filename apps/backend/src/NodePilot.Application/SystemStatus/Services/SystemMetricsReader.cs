@@ -1,16 +1,17 @@
 using System.Globalization;
 using ErrorOr;
+using NodePilot.Application.Interfaces.SystemStatus;
 using SystemStatusErrors = NodePilot.Application.SystemStatus.Errors.Errors;
 
 namespace NodePilot.Application.SystemStatus.Services;
 
 
-public sealed class SystemStatusService : ISystemStatusService
+public sealed class SystemMetricsReader : ISystemMetricsReader
 {
     private const string ProcStatPath = "/proc/stat";
     private const string ProcMemInfoPath = "/proc/meminfo";
 
-    public async Task<ErrorOr<SystemStatus>> GetSystemStatusAsync(CancellationToken cancellationToken = default)
+    public async Task<ErrorOr<SystemStatus>> ReadSystemStatusAsync(CancellationToken cancellationToken = default)
     {
         var validePlatformResult = EnsureLinux();
 
@@ -208,7 +209,7 @@ public sealed class SystemStatusService : ISystemStatusService
     {
         if (!ulong.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
         {
-            return SystemStatusErrors.SystemStatus.CpuStatisticValueInvalid(value, ProcMemInfoPath);
+            return SystemStatusErrors.SystemStatus.CpuStatisticValueInvalid(value, ProcStatPath);
         }
 
         return parsed;
