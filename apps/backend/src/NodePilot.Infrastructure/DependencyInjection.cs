@@ -1,7 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using NodePilot.Application.Interfaces.Common;
+using NodePilot.Application.Interfaces.SystemStatus;
+using NodePilot.Infrastructure.Background;
 using NodePilot.Infrastructure.Persistence;
+using NodePilot.Infrastructure.Persistence.Repositories;
 
 namespace NodePilot.Infrastructure;
 
@@ -17,6 +21,12 @@ public static class DependencyInjection
         {
             options.UseSqlite(connectionString);
         });
+
+        services.AddScoped<ISystemMetricsRepository, SystemMetricsRepository>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        // Background Services
+        services.AddHostedService<MetricsSamplingBackgroundService>();
 
         return services;
     }
