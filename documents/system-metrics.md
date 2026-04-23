@@ -1,6 +1,6 @@
-# System Metrics Gathering
+# System Metrics Collection
 
-This document explains how `SystemStatusService` gathers system metrics on Linux, what each output field means, and how the final values are calculated.
+This document explains how NodePilot reads Linux system metrics, how the background sampling flow persists them, what each output field means, and how the final values are calculated.
 
 ## Where the data comes from
 
@@ -15,7 +15,16 @@ The service only supports Linux. If the application runs on a different operatin
 
 ## High-level flow
 
-`GetSystemStatusAsync` performs these steps:
+There are two metrics flows:
+
+1. `GET /api/system/status` reads the current status on demand.
+2. `MetricsSamplingBackgroundService` collects and persists a metrics sample in the background.
+
+### Live status read
+
+`SystemController.GetSystemStatus` calls `ISystemMetricsReader.ReadSystemStatusAsync`, implemented by `SystemMetricsReader`.
+
+`ReadSystemStatusAsync` performs these steps:
 
 1. Verifies that the current OS is Linux.
 2. Reads CPU counters from `/proc/stat`.
@@ -26,9 +35,25 @@ The service only supports Linux. If the application runs on a different operatin
 7. Maps the calculated values into the `SystemStatus` response object.
 8. Rounds the percentage fields to 2 decimal places.
 
-## Output fields
+### Background sampling and persistence
 
-The service returns these values:
+`MetricsSamplingBackgroundService` is registered as a hosted service in infrastructure. It starts with an immediate collection cycle, then repeats every 5 seconds with `PeriodicTimer`.
+
+Each cycle performs these steps:
+
+1. Calls `ISystemMetricsCollector.CollectAsync`, implemented by `LinuxSystemMetricsCollector`.
+2. The collector calls `ISystemMetricsReader.ReadSystemStatusAsync`.
+3. If the read succeeds, the collector creates a successful `SystemMetric` with rounded CPU and RAM percentages.
+4. If the read fails, the collector creates a failed `SystemMetric` with `Status = ReadFailed`, null metric values, and a `FailureReason` based on the first error code.
+5. The background service creates a scoped dependency scope.
+6. It saves the sample through `ISystemMetricsRepository.SaveAsync`.
+7. It commits the insert through `IUnitOfWork.SaveChangesAsync`.
+
+Unexpected exceptions during a sampling cycle are logged and do not stop the hosted service. Cancellation still stops the service normally.
+
+## Live status fields
+
+`SystemMetricsReader` returns these values in `SystemStatus`:
 
 - `CpuUsagePercent`: Estimated CPU usage across the sampling window.
 - `RamUsagePercent`: Percentage of RAM currently in use.
@@ -36,6 +61,28 @@ The service returns these values:
 - `UsedMemoryBytes`: Used memory in bytes.
 - `AvailableMemoryBytes`: Memory currently available to applications in bytes.
 - `CollectedAtUtc`: UTC timestamp added when the response object is created.
+
+## Persisted metric fields
+
+Background samples are stored as `SystemMetric` rows in the `system_metrics` table:
+
+- `Id` / `id`: Database-generated primary key.
+- `CpuUsagePercent` / `cpu_usage_percent`: CPU usage percent for a successful read, or `NULL` for a failed read.
+- `RamUsagePercent` / `ram_usage_percent`: RAM usage percent for a successful read, or `NULL` for a failed read.
+- `Status` / `status`: Collection result stored as an integer enum.
+- `FailureReason` / `failure_reason`: Error code for a failed read, capped at 500 characters, or `NULL` for success.
+- `CollectedAtUtc` / `collected_at_utc`: UTC timestamp captured when the collector started the sample.
+
+`MetricCollectionStatus` currently has these values:
+
+- `Success` (`0`)
+- `ReadFailed` (`1`)
+
+The database enforces the expected row shape:
+
+- successful rows must have CPU and RAM values and no failure reason
+- failed rows must have no CPU or RAM values and must have a failure reason
+- CPU and RAM percentages must be `NULL` or within `0..100`
 
 ## CPU metrics
 
@@ -140,7 +187,7 @@ That value is rounded to 2 decimal places before being returned.
 
 ## Error handling
 
-The service returns domain errors instead of throwing runtime exceptions for expected metric-reading failures.
+`SystemMetricsReader` returns domain errors instead of throwing runtime exceptions for expected metric-reading failures.
 
 Examples include:
 
@@ -152,7 +199,9 @@ Examples include:
 - missing or invalid memory keys
 - invalid total memory value
 
-This keeps the service aligned with the `ErrorOr<SystemStatus>` contract.
+This keeps the live reader aligned with the `ErrorOr<SystemStatus>` contract.
+
+For background persistence, `LinuxSystemMetricsCollector` converts those errors into a persisted failed `SystemMetric` instead of discarding the sample. The stored `FailureReason` is the first error code, or `unknown_error` if the code is empty.
 
 ## Important assumptions
 
@@ -160,9 +209,20 @@ This keeps the service aligned with the `ErrorOr<SystemStatus>` contract.
 - CPU usage is an average over roughly 300 ms, not an instantaneous reading.
 - Memory values depend on what the Linux kernel reports at the time of the read.
 - The reported percentages are rounded for presentation, so they are slightly less precise than the raw calculated values.
+- The background sampling interval is currently hard-coded to 5 seconds.
+- Persisted samples contain CPU and RAM percentages only. Full memory byte counters are available from the live `SystemStatus` read but are not stored in `SystemMetric`.
 
 ## Related code
 
-- `apps/backend/src/NodePilot.Application/SystemStatus/Services/SystemStatusService.cs`
+- `apps/backend/src/NodePilot.Api/Controllers/SystemController.cs`
+- `apps/backend/src/NodePilot.Application/SystemStatus/Services/SystemMetricsReader.cs`
+- `apps/backend/src/NodePilot.Application/SystemStatus/Services/SystemMetricsCollector.cs`
 - `apps/backend/src/NodePilot.Application/SystemStatus/SystemStatus.cs`
+- `apps/backend/src/NodePilot.Application/SystemStatus/SystemMetric.cs`
 - `apps/backend/src/NodePilot.Application/SystemStatus/Errors/SystemStatusErrors.cs`
+- `apps/backend/src/NodePilot.Application/Interfaces/SystemStatus/ISystemMetricsReader.cs`
+- `apps/backend/src/NodePilot.Application/Interfaces/SystemStatus/ISystemMetricsCollector.cs`
+- `apps/backend/src/NodePilot.Application/Interfaces/SystemStatus/ISystemMetricsRepository.cs`
+- `apps/backend/src/NodePilot.Infrastructure/Background/MetricsSamplingBackgroundService.cs`
+- `apps/backend/src/NodePilot.Infrastructure/Persistence/Repositories/SystemMetricsRepository.cs`
+- `apps/backend/src/NodePilot.Infrastructure/Persistence/Configurations/SystemMetricsConfiguration.cs`
