@@ -28,7 +28,10 @@ public static class DependencyInjection
                 tags: ["general"])
             .AddCheck<SqliteHealthCheck>(
                 "database_status",
-                tags: ["general", "database"]);
+                tags: ["database", "ready"])
+            .AddCheck<MetricsCollectorReadinessCheck>(
+                "metrics_collector",
+                tags: ["collector", "ready"]);
 
         return services;
     }
