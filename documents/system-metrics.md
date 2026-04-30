@@ -200,6 +200,41 @@ Use `minIntervalSeconds` when rendering longer ranges to reduce payload size. Fo
 
 Because sampling runs in the background, a newly started application may briefly return `404` for current metrics until the first successful Linux sample is persisted.
 
+## Health checks
+
+The backend exposes:
+
+```http
+GET /health
+```
+
+### `metrics_collector`
+
+`metrics_collector` uses `MetricsCollectorState`, which is updated by `MetricsSamplingBackgroundService`.
+
+The check returns unhealthy when any of these are true:
+
+- the background sampler is not currently running
+- no successful collection has completed yet
+- the most recent successful collection is older than 30 seconds
+
+The 30-second staleness window is intentionally larger than the 5-second sampling interval so the app can tolerate a few delayed cycles before the service is considered unready.
+
+Health data for this check includes:
+
+- `isRunning`: whether the hosted sampler is currently running
+- `lastSuccessfulCollectionUtc`: timestamp of the latest successful collection, or `never`
+- `lastAttemptUtc`: timestamp of the latest attempt, or `never`
+- `lastError`: latest recorded error message, or an empty string
+- `maxSnapshotAgeSeconds`: readiness staleness threshold, currently `30`
+- `snapshotAgeSeconds`: included only after the first successful collection
+
+Example scenarios:
+
+- immediately after startup, `metrics_collector` can be unhealthy until the first successful sample is collected and persisted
+- if Linux metric reads fail repeatedly, `lastAttemptUtc` and `lastError` continue to update while `lastSuccessfulCollectionUtc` remains unchanged
+- if the hosted service stops unexpectedly, the check becomes unhealthy because `isRunning` becomes `false`
+
 ## CPU metrics
 
 ### Source
