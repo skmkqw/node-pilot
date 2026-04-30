@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NodePilot.Application.Interfaces.Common;
 using NodePilot.Application.Interfaces.SystemStatus;
+using NodePilot.Application.SystemStatus;
 using NodePilot.Infrastructure.Background;
 using NodePilot.Infrastructure.Persistence;
 using NodePilot.Infrastructure.Persistence.Repositories;
@@ -27,6 +28,7 @@ public static class DependencyInjection
 
         // Background Services
         services.AddHostedService<MetricsSamplingBackgroundService>();
+        services.AddSingleton<MetricsCollectorState>();
 
         return services;
     }
