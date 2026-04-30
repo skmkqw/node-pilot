@@ -9,6 +9,8 @@ namespace NodePilot.Infrastructure.Background;
 
 public sealed class MetricsSamplingBackgroundService : BackgroundService
 {
+    private readonly MetricsCollectorState _state;
+    
     private static readonly TimeSpan SamplingInterval = TimeSpan.FromSeconds(5);
 
     private readonly IServiceScopeFactory _scopeFactory;
@@ -18,10 +20,12 @@ public sealed class MetricsSamplingBackgroundService : BackgroundService
     private readonly ILogger<MetricsSamplingBackgroundService> _logger;
 
     public MetricsSamplingBackgroundService(
+        MetricsCollectorState state,
         IServiceScopeFactory scopeFactory,
         ISystemMetricsCollector collector,
         ILogger<MetricsSamplingBackgroundService> logger)
     {
+        _state = state;
         _scopeFactory = scopeFactory;
         _collector = collector;
         _logger = logger;
@@ -29,16 +33,18 @@ public sealed class MetricsSamplingBackgroundService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var executedAt = DateTimeOffset.UtcNow;
+        _state.MarkRunning();
 
-        _logger.LogInformation("Metrics sampling background service started at {ExecutedAt}.", executedAt);
-
-        await CollectAndPersistAsync(stoppingToken);
-
-        using var timer = new PeriodicTimer(SamplingInterval);
+        _logger.LogInformation(
+            "Metrics sampling background service started at {StartedAtUtc}.",
+            DateTimeOffset.UtcNow);
 
         try
         {
+            await CollectAndPersistAsync(stoppingToken);
+
+            using var timer = new PeriodicTimer(SamplingInterval);
+
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
                 await CollectAndPersistAsync(stoppingToken);
@@ -48,10 +54,24 @@ public sealed class MetricsSamplingBackgroundService : BackgroundService
         {
             _logger.LogInformation("Metrics sampling background service stopped.");
         }
+        catch (Exception ex)
+        {
+            _state.MarkFailure(DateTimeOffset.UtcNow, ex.Message);
+
+            _logger.LogError(
+                ex,
+                "Metrics sampling background service failed unexpectedly.");
+        }
+        finally
+        {
+            _state.MarkStopped();
+        }
     }
 
     private async Task CollectAndPersistAsync(CancellationToken cancellationToken)
     {
+        var attemptedAtUtc = DateTimeOffset.UtcNow;
+        
         try
         {
             var metric = await _collector.CollectAsync(cancellationToken);
@@ -70,22 +90,27 @@ public sealed class MetricsSamplingBackgroundService : BackgroundService
                     metric.CollectedAtUtc,
                     metric.CpuUsagePercent,
                     metric.RamUsagePercent);
+
+                _state.MarkSuccess(DateTimeOffset.UtcNow);
             }
             else
             {
+                _state.MarkFailure(attemptedAtUtc, metric.FailureReason ?? "unknown_error");
+
                 _logger.LogWarning(
-                    "Failed metrics read persisted at {CollectedAtUtc}. Reason: {FailureReason}",
+                    "Failed metrics read at {CollectedAtUtc}. Reason: {FailureReason}",
                     metric.CollectedAtUtc,
-                    metric.FailureReason);
+                    metric.FailureReason);                
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Unexpected error during metrics collection cycle.");
+            _state.MarkFailure(attemptedAtUtc, ex.Message);
+
+            _logger.LogWarning(
+                ex,
+                "Metrics sampling attempt failed at {AttemptedAtUtc}.",
+                attemptedAtUtc);
         }
     }
 }
