@@ -125,7 +125,12 @@ Endpoint:
 GET /health
 ```
 
-- `/health` runs the backend `system_status` health check and returns a JSON response with the overall health status, execution timing, and per-check details.
+- `/health` runs three backend health checks and returns a JSON response with the overall health status, total execution time, and per-check details.
+- Registered checks:
+  - `system_status`: reports basic process and host metadata such as OS, processor count, and .NET runtime version.
+  - `database_status`: verifies the SQLite database is reachable by opening a connection and executing `SELECT 1`.
+  - `metrics_collector`: verifies the background metrics sampler is running and that it has produced a recent successful sample.
+- `metrics_collector` is reported as unhealthy when the sampler is not running, has not completed a successful collection yet, or its latest successful sample is older than 30 seconds.
 
 ### Option 3. Start the Web App (Next.js)
 
@@ -151,3 +156,5 @@ After setup, confirm that:
 - `http://localhost:5000/health` returns a healthy JSON response
 - `http://localhost:3000/api/health` returns `{ "status": "ok" }`
 - The frontend loads at `http://localhost:3000`
+
+The backend health response includes a top-level `status`, `totalDuration`, and a `checks` array. Each item in `checks` includes `name`, `status`, `description`, `duration`, `tags`, and `data`.
