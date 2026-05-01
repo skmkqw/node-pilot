@@ -35,7 +35,6 @@ export function StatusCard({
     label,
     value,
     helper,
-    detail,
     progress,
     tone = "neutral",
     compact = false,
@@ -45,7 +44,7 @@ export function StatusCard({
     return (
         <article
             className={[
-                "rounded-[1.5rem] border border-white/10 bg-white/[0.045] shadow-[0_20px_45px_rgba(2,6,23,0.24)] backdrop-blur",
+                "rounded-3xl border border-white/10 bg-white/4.5 shadow-[0_20px_45px_rgba(2,6,23,0.24)] backdrop-blur",
                 compact ? "p-4" : "p-5 xl:p-6",
             ].join(" ")}
         >
@@ -82,10 +81,6 @@ export function StatusCard({
                         />
                     </div>
                 </div>
-            ) : null}
-
-            {!compact && detail ? (
-                <p className="mt-4 text-sm leading-6 text-slate-400">{detail}</p>
             ) : null}
         </article>
     );
