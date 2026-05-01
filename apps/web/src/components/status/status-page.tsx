@@ -6,7 +6,7 @@ import { SystemMetricDto } from "@/types/system-metric";
 import { StatusDashboard } from "./status-dashboard";
 
 const STATUS_REFRESH_MS = 5000;
-const HISTORY_INTERVAL_SECONDS = 60;
+const HISTORY_INTERVAL_SECONDS = 120;
 const HISTORY_REFRESH_MS = HISTORY_INTERVAL_SECONDS * 1000;
 const HISTORY_WINDOW_MS = 60 * 60 * 1000;
 
@@ -193,12 +193,13 @@ export function StatusPage() {
 }
 
 function getHistoryWindow() {
-    const end = new Date();
+    const now = Date.now();
 
-    end.setSeconds(0, 0);
+    const endMs =
+        Math.floor(now / HISTORY_REFRESH_MS) * HISTORY_REFRESH_MS;
 
     return {
-        startUtc: new Date(end.getTime() - HISTORY_WINDOW_MS).toISOString(),
-        endUtc: end.toISOString(),
+        startUtc: new Date(endMs - HISTORY_WINDOW_MS).toISOString(),
+        endUtc: new Date(endMs).toISOString(),
     };
 }
