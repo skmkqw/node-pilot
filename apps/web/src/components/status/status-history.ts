@@ -18,15 +18,23 @@ export function buildHistorySeries(
     endTimeUtc: string,
     intervalSeconds: number
 ) {
-    const startTime = alignUtcBucket(new Date(startTimeUtc), intervalSeconds).getTime();
-    const endTime = alignUtcBucket(new Date(endTimeUtc), intervalSeconds).getTime();
+    const startTime = alignUtcBucket(
+        parseUtcDate(startTimeUtc),
+        intervalSeconds
+    ).getTime();
+
+    const endTime = alignUtcBucket(
+        parseUtcDate(endTimeUtc),
+        intervalSeconds
+    ).getTime();
+
     const intervalMs = intervalSeconds * 1000;
     const duration = Math.max(endTime - startTime, intervalMs);
     const buckets = new Map<number, SystemMetricDto>();
 
     for (const sample of history) {
         const bucketTime = alignUtcBucket(
-            new Date(sample.collectedAtUtc),
+            parseUtcDate(sample.collectedAtUtc),
             intervalSeconds
         ).getTime();
 
@@ -39,18 +47,24 @@ export function buildHistorySeries(
 
     const points: ChartPoint[] = [];
 
-    for (let bucketTime = startTime; bucketTime <= endTime; bucketTime += intervalMs) {
+    for (
+        let bucketTime = startTime;
+        bucketTime <= endTime;
+        bucketTime += intervalMs
+    ) {
         const sample = buckets.get(bucketTime) ?? null;
         const sampleValue = sample?.[metric] ?? null;
-        const state = sample
-            ? sample.status === 1 || sampleValue === null
-                ? "failed"
-                : "success"
-            : "missing";
+
         const value =
             typeof sampleValue === "number"
                 ? Math.max(0, Math.min(sampleValue, 100))
                 : null;
+
+        const state: ChartPoint["state"] = sample
+            ? sample.status === 1 || value === null
+                ? "failed"
+                : "success"
+            : "missing";
 
         points.push({
             bucketTime: new Date(bucketTime),
@@ -71,16 +85,21 @@ export function buildHistorySeries(
     };
 }
 
-function alignUtcBucket(date: Date, intervalSeconds: number) {
-    const aligned = new Date(date);
+function alignUtcBucket(date: Date, intervalSeconds: number): Date {
     const intervalMs = intervalSeconds * 1000;
-    const alignedTime = Math.floor(aligned.getTime() / intervalMs) * intervalMs;
+    const alignedTime = Math.floor(date.getTime() / intervalMs) * intervalMs;
 
-    aligned.setTime(alignedTime);
-
-    return aligned;
+    return new Date(alignedTime);
 }
 
-function yForPercent(value: number) {
+function parseUtcDate(value: string): Date {
+    if (value.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(value)) {
+        return new Date(value);
+    }
+
+    return new Date(`${value}Z`);
+}
+
+function yForPercent(value: number): number {
     return 24 + (1 - value / 100) * 276;
 }
