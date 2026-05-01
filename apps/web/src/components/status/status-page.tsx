@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getSystemStatus } from "@/lib/api/status";
+import { getSystemStatus } from "@/lib/api/client";
 import { SystemStatusDto } from "@/types/system-status";
 import { StatusGrid } from "./status-grid";
 
@@ -24,7 +24,13 @@ export function StatusPage() {
                 if (!isActive) return;
 
                 setStatus(data);
-                setError(null);
+
+                if (data.status = 1) {
+                    setError(data.failureReason);
+                }
+                else{
+                    setError(null);
+                }
             } catch (err) {
                 if (!isActive) return;
 
