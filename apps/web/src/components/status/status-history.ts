@@ -29,7 +29,11 @@ export function buildHistorySeries(
     ).getTime();
 
     const intervalMs = intervalSeconds * 1000;
-    const duration = Math.max(endTime - startTime, intervalMs);
+    const expectedPoints = Math.max(
+        Math.floor((endTime - startTime) / intervalMs),
+        0
+    );
+    const chartSpan = Math.max((expectedPoints - 1) * intervalMs, intervalMs);
     const buckets = new Map<number, SystemMetricDto>();
 
     for (const sample of history) {
@@ -38,7 +42,7 @@ export function buildHistorySeries(
             intervalSeconds
         ).getTime();
 
-        if (bucketTime < startTime || bucketTime > endTime) {
+        if (bucketTime < startTime || bucketTime >= endTime) {
             continue;
         }
 
@@ -49,7 +53,7 @@ export function buildHistorySeries(
 
     for (
         let bucketTime = startTime;
-        bucketTime <= endTime;
+        bucketTime < endTime;
         bucketTime += intervalMs
     ) {
         const sample = buckets.get(bucketTime) ?? null;
@@ -71,7 +75,7 @@ export function buildHistorySeries(
             sample,
             state,
             value,
-            x: 26 + ((bucketTime - startTime) / duration) * 948,
+            x: 26 + ((bucketTime - startTime) / chartSpan) * 948,
             y: value === null ? 314 : yForPercent(value),
         });
     }
@@ -81,7 +85,7 @@ export function buildHistorySeries(
         successCount: points.filter((point) => point.state === "success").length,
         failedCount: points.filter((point) => point.state === "failed").length,
         missingCount: points.filter((point) => point.state === "missing").length,
-        expectedPoints: points.length,
+        expectedPoints,
     };
 }
 
