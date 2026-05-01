@@ -1,4 +1,4 @@
-import { SystemStatusDto } from "@/types/system-status";
+import { SystemMetricDto } from "@/types/system-metric";
 
 const DEFAULT_API_BASE_URL = "http://localhost:5000";
 
@@ -30,22 +30,62 @@ async function requestJson<T>(path: string, signal?: AbortSignal): Promise<T> {
 
 export async function getSystemStatus(
     signal?: AbortSignal
-): Promise<SystemStatusDto> {
-    const data = await requestJson<SystemStatusDto>("/api/system/metrics/current", signal);
+): Promise<SystemMetricDto> {
+    const data = await requestJson<SystemMetricDto>(
+        "/api/system/metrics/current",
+        signal
+    );
 
-    validateSystemStatus(data);
+    validateSystemMetrics(data);
 
     return data;
 }
 
-function validateSystemStatus(data: SystemStatusDto) {
+type HistoricalMetricsParams = {
+    start: string;
+    end: string;
+    minIntervalSeconds?: number;
+};
+
+export async function getHistoricalSystemMetrics(
+    { start, end, minIntervalSeconds }: HistoricalMetricsParams,
+    signal?: AbortSignal
+): Promise<SystemMetricDto[]> {
+    const searchParams = new URLSearchParams({ start, end });
+
+    if (typeof minIntervalSeconds === "number") {
+        searchParams.set("minIntervalSeconds", minIntervalSeconds.toString());
+    }
+
+    const data = await requestJson<SystemMetricDto[]>(
+        `/api/system/metrics/historical?${searchParams.toString()}`,
+        signal
+    );
+
+    validateHistoricalMetrics(data);
+
+    return data;
+}
+
+function validateSystemMetrics(data: SystemMetricDto) {
     if (
+        typeof data.id !== "number" ||
         typeof data.cpuUsagePercent !== "number" ||
         typeof data.ramUsagePercent !== "number" ||
-        typeof data.status !== "number" ||
+        (data.status !== 0 && data.status !== 1) ||
         (data.failureReason !== null && typeof data.failureReason !== "string") ||
         typeof data.collectedAtUtc !== "string"
     ) {
-        throw new Error("Invalid status payload received from backend.");
+        throw new Error("Invalid metrics payload received from backend.");
+    }
+}
+
+function validateHistoricalMetrics(data: SystemMetricDto[]) {
+    if (!Array.isArray(data)) {
+        throw new Error("Invalid historical metrics payload received from backend.");
+    }
+
+    for (const item of data) {
+        validateSystemMetrics(item)
     }
 }
