@@ -1,8 +1,7 @@
 export type SystemStatusDto = {
 	cpuUsagePercent: number;
 	ramUsagePercent: number;
-	totalMemoryBytes: number;
-	usedMemoryBytes: number;
-	availableMemoryBytes: number;
+	status: 0 | 1,
+    failureReason: string | null;
 	collectedAtUtc: string;
 };
