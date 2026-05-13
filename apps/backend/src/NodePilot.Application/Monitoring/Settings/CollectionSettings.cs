@@ -1,20 +1,28 @@
+using Microsoft.Extensions.Configuration;
+
 namespace NodePilot.Application.Monitoring.Settings;
 
 
 public sealed class CollectionSettings
 {
     // USED
-    public int IntervalSeconds { get; init; } = 5;
+    [ConfigurationKeyName("IntervalSeconds")]
+    public int IntervalSeconds { get; init; }
+    
+    [ConfigurationKeyName("Enabled")]
+    public bool Enabled { get; init; }
 
-    public bool Enabled { get; init; } = true;
+    [ConfigurationKeyName("CollectCpuUsage")]
+    public bool CollectCpuUsage { get; init; }
 
-    public bool CollectCpuUsage { get; init; } = true;
-
-    public bool CollectRamUsage { get; init; } = true;
+    [ConfigurationKeyName("CollectRamUsage")]
+    public bool CollectRamUsage { get; init; }
 
 
     // NOT USED
-    public bool CollectDiskUsage { get; init; } = true;
+    [ConfigurationKeyName("CollectDiskUsage")]
+    public bool CollectDiskUsage { get; init; }
 
-    public bool CollectTemperature { get; init; } = true;
+    [ConfigurationKeyName("CollectTemperature")]
+    public bool CollectTemperature { get; init; }
 }

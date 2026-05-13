@@ -1,12 +1,17 @@
+using Microsoft.Extensions.Configuration;
+
 namespace NodePilot.Application.Monitoring.Settings;
 
 
 public sealed class MonitoringSettings
 {
-    public CollectionSettings Collection { get; init; } = new();
+    [ConfigurationKeyName("Collection")]
+    public CollectionSettings Collection { get; init; } = null!;
 
-    public RetentionSettings Retention { get; init; } = new();
+    [ConfigurationKeyName("Retention")]
+    public RetentionSettings Retention { get; init; } = null!;
 
     // NOT USED 
-    public AlertingSettings Alerts { get; init; } = new();
+    [ConfigurationKeyName("Alerts")]
+    public AlertingSettings Alerts { get; init; } = null!;
 }
