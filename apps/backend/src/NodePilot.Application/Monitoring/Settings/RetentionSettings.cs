@@ -1,13 +1,19 @@
+using Microsoft.Extensions.Configuration;
+
 namespace NodePilot.Application.Monitoring.Settings;
 
 
 public sealed class RetentionSettings
 {
-    public int MaxMetricAgeHours { get; init; } = 24;
+    [ConfigurationKeyName("MaxMetricAgeHours")]
+    public int MaxMetricAgeHours { get; init; }
 
-    public int CleanupIntervalMinutes { get; init; } = 30;
+    [ConfigurationKeyName("CleanupIntervalMinutes")]
+    public int CleanupIntervalMinutes { get; init; }
 
-    public int MaxStoredSamples { get; init; } = 100_000;
+    [ConfigurationKeyName("MaxStoredSamples")]
+    public int MaxStoredSamples { get; init; }
 
-    public bool CleanupEnabled { get; init; } = true;
+    [ConfigurationKeyName("CleanupEnabled")]
+    public bool CleanupEnabled { get; init; }
 }

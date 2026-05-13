@@ -1,15 +1,22 @@
+using Microsoft.Extensions.Configuration;
+
 namespace NodePilot.Application.Monitoring.Settings;
 
 
 public sealed class AlertingSettings
 {
-    public double CpuWarningThresholdPercent { get; init; } = 85;
+    [ConfigurationKeyName("CpuWarningThresholdPercent")]
+    public double CpuWarningThresholdPercent { get; init; }
 
-    public double RamWarningThresholdPercent { get; init; } = 90;
+    [ConfigurationKeyName("RamWarningThresholdPercent")]
+    public double RamWarningThresholdPercent { get; init; }
 
-    public double DiskWarningThresholdPercent { get; init; } = 90;
+    [ConfigurationKeyName("DiskWarningThresholdPercent")]
+    public double DiskWarningThresholdPercent { get; init; }
 
-    public double CpuTemperatureWarningCelsius { get; init; } = 80;
+    [ConfigurationKeyName("CpuTemperatureWarningCelsius")]
+    public double CpuTemperatureWarningCelsius { get; init; }
 
-    public bool NotificationsEnabled { get; init; } = true;
+    [ConfigurationKeyName("NotificationsEnabled")]
+    public bool NotificationsEnabled { get; init; }
 }
