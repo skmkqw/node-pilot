@@ -20,7 +20,7 @@ namespace NodePilot.Infrastructure.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.6");
 
-            modelBuilder.Entity("NodePilot.Application.SystemStatus.SystemMetric", b =>
+            modelBuilder.Entity("NodePilot.Application.Monitoring.SystemMetric", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()

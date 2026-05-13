@@ -1,9 +1,9 @@
 using System.Globalization;
 using ErrorOr;
-using NodePilot.Application.Interfaces.SystemStatus;
-using SystemStatusErrors = NodePilot.Application.SystemStatus.Errors.Errors;
+using NodePilot.Application.Interfaces.Monitoring;
+using SystemStatusErrors = NodePilot.Application.Monitoring.Errors.Errors;
 
-namespace NodePilot.Application.SystemStatus.Services;
+namespace NodePilot.Application.Monitoring.Services;
 
 
 public sealed class SystemMetricsReader : ISystemMetricsReader

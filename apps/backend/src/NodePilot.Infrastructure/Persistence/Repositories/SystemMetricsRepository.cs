@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using NodePilot.Application.Interfaces.SystemStatus;
-using NodePilot.Application.SystemStatus;
+using NodePilot.Application.Interfaces.Monitoring;
+using NodePilot.Application.Monitoring;
 
 namespace NodePilot.Infrastructure.Persistence.Repositories;
 

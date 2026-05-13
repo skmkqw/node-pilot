@@ -1,8 +1,8 @@
 using ErrorOr;
 using Microsoft.Extensions.Logging;
-using NodePilot.Application.Interfaces.SystemStatus;
+using NodePilot.Application.Interfaces.Monitoring;
 
-namespace NodePilot.Application.SystemStatus.Services;
+namespace NodePilot.Application.Monitoring.Services;
 
 public sealed class LinuxSystemMetricsCollector : ISystemMetricsCollector
 {
