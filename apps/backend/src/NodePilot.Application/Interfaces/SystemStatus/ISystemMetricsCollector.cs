@@ -1,6 +1,6 @@
-using NodePilot.Application.SystemStatus;
+using NodePilot.Application.Monitoring;
 
-namespace NodePilot.Application.Interfaces.SystemStatus;
+namespace NodePilot.Application.Interfaces.Monitoring;
 
 public interface ISystemMetricsCollector
 {

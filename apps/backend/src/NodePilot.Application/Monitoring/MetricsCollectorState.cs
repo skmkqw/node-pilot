@@ -1,5 +1,5 @@
 
-namespace NodePilot.Application.SystemStatus;
+namespace NodePilot.Application.Monitoring;
 
 public sealed class MetricsCollectorState
 {

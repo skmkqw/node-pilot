@@ -2,8 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NodePilot.Application.Interfaces.Common;
-using NodePilot.Application.Interfaces.SystemStatus;
-using NodePilot.Application.SystemStatus;
+using NodePilot.Application.Interfaces.Monitoring;
+using NodePilot.Application.Monitoring;
 
 namespace NodePilot.Infrastructure.Background;
 

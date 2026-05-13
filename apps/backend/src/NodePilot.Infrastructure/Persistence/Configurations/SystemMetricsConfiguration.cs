@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using NodePilot.Application.SystemStatus;
+using NodePilot.Application.Monitoring;
 
 namespace NodePilot.Infrastructure.Persistence.Configurations;
 

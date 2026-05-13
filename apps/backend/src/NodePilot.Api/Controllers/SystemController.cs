@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using NodePilot.Application.Interfaces.SystemStatus;
+using NodePilot.Application.Interfaces.Monitoring;
 
 namespace NodePilot.Api.Controllers;
 

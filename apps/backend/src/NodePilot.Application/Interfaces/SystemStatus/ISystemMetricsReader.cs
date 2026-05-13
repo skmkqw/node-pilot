@@ -1,8 +1,9 @@
 using ErrorOr;
+using NodePilot.Application.Monitoring;
 
-namespace NodePilot.Application.Interfaces.SystemStatus;
+namespace NodePilot.Application.Interfaces.Monitoring;
 
 public interface ISystemMetricsReader
 {
-    Task<ErrorOr<Application.SystemStatus.SystemStatus>> ReadSystemStatusAsync(CancellationToken cancellationToken = default);
+    Task<ErrorOr<SystemStatus>> ReadSystemStatusAsync(CancellationToken cancellationToken = default);
 }
