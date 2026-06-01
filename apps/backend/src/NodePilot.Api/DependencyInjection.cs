@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using NodePilot.Api.HealthChecks;
 
 namespace NodePilot.Api;
@@ -6,7 +7,10 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddPresentation(this IServiceCollection services)
     {
-        services.AddControllers();
+        services.AddControllers().AddJsonOptions(opts =>
+        {
+            opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        });;
 
         services.AddCors(options =>
         {
