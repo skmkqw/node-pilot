@@ -11,49 +11,13 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
     private const string ProcStatPath = "/proc/stat";
     private const string ProcMemInfoPath = "/proc/meminfo";
 
-    public async Task<ErrorOr<SystemStatus>> ReadSystemStatusAsync(CancellationToken cancellationToken = default)
+    public async Task<ErrorOr<double>> ReadCpuUsagePercentAsync(CancellationToken cancellationToken)
     {
         var validePlatformResult = EnsureLinux();
 
         if (validePlatformResult.IsError)
             return validePlatformResult.Errors;
 
-        var cpuUsageResult = await ReadCpuUsagePercentAsync(cancellationToken);
-
-        if (cpuUsageResult.IsError)
-            return cpuUsageResult.Errors;
-
-        var memoryResult = ReadMemoryInfo();
-
-        if (memoryResult.IsError)
-            return memoryResult.Errors;
-
-        var cpuUsage = cpuUsageResult.Value;
-        var memory = memoryResult.Value;
-
-        return new SystemStatus
-        {
-            CpuUsagePercent = Math.Round(cpuUsage, 2),
-            RamUsagePercent = Math.Round(memory.RamUsagePercent, 2),
-            TotalMemoryBytes = memory.TotalMemoryBytes,
-            UsedMemoryBytes = memory.UsedMemoryBytes,
-            AvailableMemoryBytes = memory.AvailableMemoryBytes,
-            CollectedAtUtc = DateTimeOffset.UtcNow,
-        };
-    }
-
-    private static ErrorOr<Success> EnsureLinux()
-    {
-        if (!OperatingSystem.IsLinux())
-        {
-            return SystemStatusErrors.SystemStatus.PlatformNotSupported;
-        }
-
-        return Result.Success;
-    }
-
-    private static async Task<ErrorOr<double>> ReadCpuUsagePercentAsync(CancellationToken cancellationToken)
-    {
         var firstResult = ReadCpuTimes();
 
         if (firstResult.IsError)
@@ -78,6 +42,57 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
 
         var usage = 100.0 * (1.0 - ((double)idleDelta / totalDelta));
         return Math.Clamp(usage, 0, 100);
+    }
+
+    public ErrorOr<MemoryInfo> ReadMemoryInfo()
+    {
+        var validePlatformResult = EnsureLinux();
+
+        if (validePlatformResult.IsError)
+            return validePlatformResult.Errors;
+
+        string[] lines;
+
+        try
+        {
+            lines = File.ReadAllLines(ProcMemInfoPath);
+        }
+        catch (IOException)
+        {
+            return SystemStatusErrors.SystemStatus.MemoryInfoUnavailable(ProcMemInfoPath);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return SystemStatusErrors.SystemStatus.MemoryInfoUnavailable(ProcMemInfoPath);
+        }
+
+        var totalKbResult = ReadMemInfoValueKb(lines, "MemTotal");
+
+        if (totalKbResult.IsError)
+            return totalKbResult.Errors;
+
+        var availableKbResult = ReadMemInfoValueKb(lines, "MemAvailable");
+
+        if (availableKbResult.IsError)
+            return availableKbResult.Errors;
+
+        long totalKb = totalKbResult.Value;
+        long availableKb = availableKbResult.Value;
+
+        if (totalKb <= 0)
+        {
+            return SystemStatusErrors.SystemStatus.MemoryTotalInvalid(ProcMemInfoPath);
+        }
+
+        long usedKb = totalKb - availableKb;
+
+        long totalBytes = totalKb * 1024;
+        long availableBytes = availableKb * 1024;
+        long usedBytes = usedKb * 1024;
+
+        double usagePercent = 100.0 * usedKb / totalKb;
+
+        return new MemoryInfo(totalBytes, usedBytes, availableBytes, usagePercent);
     }
 
     private static ErrorOr<CpuTimes> ReadCpuTimes()
@@ -140,52 +155,6 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
         return new CpuTimes(idleAll, total);
     }
 
-    private static ErrorOr<MemoryInfo> ReadMemoryInfo()
-    {
-        string[] lines;
-
-        try
-        {
-            lines = File.ReadAllLines(ProcMemInfoPath);
-        }
-        catch (IOException)
-        {
-            return SystemStatusErrors.SystemStatus.MemoryInfoUnavailable(ProcMemInfoPath);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return SystemStatusErrors.SystemStatus.MemoryInfoUnavailable(ProcMemInfoPath);
-        }
-
-        var totalKbResult = ReadMemInfoValueKb(lines, "MemTotal");
-
-        if (totalKbResult.IsError)
-            return totalKbResult.Errors;
-
-        var availableKbResult = ReadMemInfoValueKb(lines, "MemAvailable");
-
-        if (availableKbResult.IsError)
-            return availableKbResult.Errors;
-
-        long totalKb = totalKbResult.Value;
-        long availableKb = availableKbResult.Value;
-
-        if (totalKb <= 0)
-        {
-            return SystemStatusErrors.SystemStatus.MemoryTotalInvalid(ProcMemInfoPath);
-        }
-
-        long usedKb = totalKb - availableKb;
-
-        long totalBytes = totalKb * 1024;
-        long availableBytes = availableKb * 1024;
-        long usedBytes = usedKb * 1024;
-
-        double usagePercent = 100.0 * usedKb / totalKb;
-
-        return new MemoryInfo(totalBytes, usedBytes, availableBytes, usagePercent);
-    }
-
     private static ErrorOr<long> ReadMemInfoValueKb(IEnumerable<string> lines, string key)
     {
         var line = lines.FirstOrDefault(x => x.StartsWith(key + ":", StringComparison.Ordinal));
@@ -215,11 +184,15 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
         return parsed;
     }
 
-    private readonly record struct CpuTimes(ulong Idle, ulong Total);
+    private static ErrorOr<Success> EnsureLinux()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return SystemStatusErrors.SystemStatus.PlatformNotSupported;
+        }
 
-    private readonly record struct MemoryInfo(
-        long TotalMemoryBytes,
-        long UsedMemoryBytes,
-        long AvailableMemoryBytes,
-        double RamUsagePercent);
+        return Result.Success;
+    }
+
+    private readonly record struct CpuTimes(ulong Idle, ulong Total);
 }
