@@ -5,5 +5,7 @@ namespace NodePilot.Application.Interfaces.Monitoring;
 
 public interface ISystemMetricsReader
 {
-    Task<ErrorOr<SystemStatus>> ReadSystemStatusAsync(CancellationToken cancellationToken = default);
+    Task<ErrorOr<double>> ReadCpuUsagePercentAsync(CancellationToken cancellationToken = default);
+
+    ErrorOr<MemoryInfo> ReadMemoryInfo();
 }
