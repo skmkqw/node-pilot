@@ -41,6 +41,7 @@ public static class DependencyInjection
             .Bind(configuration.GetSection("Monitoring"), options => options.ErrorOnUnknownConfiguration = true)
             .ValidateFluently()
             .ValidateOnStart();
+        services.AddSingleton<IMonitoringSettingsProvider, MonitoringSettingsProvider>();
 
         return services;
     }
