@@ -17,16 +17,20 @@ namespace NodePilot.Infrastructure.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.6");
 
-            modelBuilder.Entity("NodePilot.Application.SystemStatus.SystemMetric", b =>
+            modelBuilder.Entity("NodePilot.Application.Monitoring.SystemMetric", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
                         .HasColumnName("id");
 
-                    b.Property<DateTimeOffset>("CollectedAtUtc")
+                    b.Property<DateTime>("CollectedAtUtc")
                         .HasColumnType("TEXT")
                         .HasColumnName("collected_at_utc");
+
+                    b.Property<bool>("CpuEnabled")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("cpu_enabled");
 
                     b.Property<double?>("CpuUsagePercent")
                         .HasColumnType("REAL")
@@ -37,6 +41,10 @@ namespace NodePilot.Infrastructure.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("failure_reason");
 
+                    b.Property<bool>("RamEnabled")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ram_enabled");
+
                     b.Property<double?>("RamUsagePercent")
                         .HasColumnType("REAL")
                         .HasColumnName("ram_usage_percent");
@@ -44,6 +52,14 @@ namespace NodePilot.Infrastructure.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER")
                         .HasColumnName("status");
+
+                    b.Property<int>("SuccessfulReads")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("successful_reads");
+
+                    b.Property<int>("TotalReads")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("total_reads");
 
                     b.HasKey("Id");
 
@@ -57,11 +73,17 @@ namespace NodePilot.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("ck_system_metrics_cpu_usage_percent_range", "cpu_usage_percent IS NULL OR (cpu_usage_percent >= 0 AND cpu_usage_percent <= 100)");
 
+                            t.HasCheckConstraint("ck_system_metrics_partial_success_shape", "(status != 1 OR (successful_reads > 0 AND successful_reads < total_reads AND failure_reason IS NOT NULL))");
+
                             t.HasCheckConstraint("ck_system_metrics_ram_usage_percent_range", "ram_usage_percent IS NULL OR (ram_usage_percent >= 0 AND ram_usage_percent <= 100)");
 
-                            t.HasCheckConstraint("ck_system_metrics_read_failed_shape", "(status != 1 OR (cpu_usage_percent IS NULL AND ram_usage_percent IS NULL AND failure_reason IS NOT NULL))");
+                            t.HasCheckConstraint("ck_system_metrics_read_failed_shape", "(status != 2 OR (successful_reads = 0 AND failure_reason IS NOT NULL))");
 
-                            t.HasCheckConstraint("ck_system_metrics_success_shape", "(status != 0 OR (cpu_usage_percent IS NOT NULL AND ram_usage_percent IS NOT NULL AND failure_reason IS NULL))");
+                            t.HasCheckConstraint("ck_system_metrics_reads_valid", "total_reads >= 0 AND successful_reads >= 0 AND successful_reads <= total_reads");
+
+                            t.HasCheckConstraint("ck_system_metrics_success_shape", "(status != 0 OR (successful_reads = total_reads AND failure_reason IS NULL))");
+
+                            t.HasCheckConstraint("ck_system_metrics_total_reads_matches_enabled_metrics", "total_reads = (CASE WHEN cpu_enabled THEN 1 ELSE 0 END) + (CASE WHEN ram_enabled THEN 1 ELSE 0 END)");
                         });
                 });
 #pragma warning restore 612, 618

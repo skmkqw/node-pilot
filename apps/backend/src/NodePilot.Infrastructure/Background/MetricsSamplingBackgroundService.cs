@@ -2,37 +2,47 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NodePilot.Application.Interfaces.Common;
-using NodePilot.Application.Interfaces.SystemStatus;
-using NodePilot.Application.SystemStatus;
+using NodePilot.Application.Interfaces.Monitoring;
+using NodePilot.Application.Monitoring;
 
 namespace NodePilot.Infrastructure.Background;
 
 public sealed class MetricsSamplingBackgroundService : BackgroundService
 {
     private readonly MetricsCollectorState _state;
-    
-    private static readonly TimeSpan SamplingInterval = TimeSpan.FromSeconds(5);
 
     private readonly IServiceScopeFactory _scopeFactory;
 
     private readonly ISystemMetricsCollector _collector;
-    
+
+    private readonly IMonitoringSettingsProvider _monitoringSettingsProvider;
+
     private readonly ILogger<MetricsSamplingBackgroundService> _logger;
 
     public MetricsSamplingBackgroundService(
         MetricsCollectorState state,
         IServiceScopeFactory scopeFactory,
         ISystemMetricsCollector collector,
+        IMonitoringSettingsProvider monitoringSettingsProvider,
         ILogger<MetricsSamplingBackgroundService> logger)
     {
         _state = state;
         _scopeFactory = scopeFactory;
         _collector = collector;
+        _monitoringSettingsProvider = monitoringSettingsProvider;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var settings = _monitoringSettingsProvider.Current.Collection;
+
+        if (!settings.Enabled)
+        {
+            _state.MarkStopped();
+            return;
+        }
+
         _state.MarkRunning();
 
         _logger.LogInformation(
@@ -43,7 +53,8 @@ public sealed class MetricsSamplingBackgroundService : BackgroundService
         {
             await CollectAndPersistAsync(stoppingToken);
 
-            using var timer = new PeriodicTimer(SamplingInterval);
+            var samplingInterval = TimeSpan.FromSeconds(settings.IntervalSeconds);
+            using var timer = new PeriodicTimer(samplingInterval);
 
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
@@ -71,7 +82,7 @@ public sealed class MetricsSamplingBackgroundService : BackgroundService
     private async Task CollectAndPersistAsync(CancellationToken cancellationToken)
     {
         var attemptedAtUtc = DateTimeOffset.UtcNow;
-        
+
         try
         {
             var metric = await _collector.CollectAsync(cancellationToken);
@@ -83,7 +94,7 @@ public sealed class MetricsSamplingBackgroundService : BackgroundService
             await metricsRepository.SaveAsync(metric, cancellationToken);
             await unitOfWork.SaveChangesAsync(cancellationToken);
 
-            if (metric.Status == MetricCollectionStatus.Success)
+            if (metric.Status != MetricCollectionStatus.ReadFailed)
             {
                 _logger.LogDebug(
                     "Metrics sample persisted at {CollectedAtUtc}. CPU: {CpuUsagePercent}, RAM: {RamUsagePercent}",
@@ -100,7 +111,7 @@ public sealed class MetricsSamplingBackgroundService : BackgroundService
                 _logger.LogWarning(
                     "Failed metrics read at {CollectedAtUtc}. Reason: {FailureReason}",
                     metric.CollectedAtUtc,
-                    metric.FailureReason);                
+                    metric.FailureReason);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
