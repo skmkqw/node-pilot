@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
-using NodePilot.Application.Interfaces.SystemStatus;
+using NodePilot.Application.Interfaces.Monitoring;
 
-using NodePilot.Application.SystemStatus.Services;
+using NodePilot.Application.Monitoring.Services;
 
 namespace NodePilot.Application;
 

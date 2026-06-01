@@ -1,6 +1,6 @@
 using ErrorOr;
 
-namespace NodePilot.Application.SystemStatus.Errors;
+namespace NodePilot.Application.Monitoring.Errors;
 
 public static class Errors
 {
