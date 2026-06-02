@@ -1,12 +1,14 @@
 using ErrorOr;
 using NodePilot.Application.Interfaces.Monitoring;
+using NodePilot.Application.Monitoring.Models;
 
 namespace NodePilot.Application.Monitoring.Services;
 
 public sealed class SystemMetricsProvider : ISystemMetricsProvider
 {
     private static readonly TimeSpan MaxHistoryRange = TimeSpan.FromDays(7);
-    private const int MinimumSamplingIntervalSeconds = 5;
+
+    private const int MinimumBucketSizeSeconds = 5;
 
     private readonly ISystemMetricsRepository _metricsRepository;
 
@@ -29,13 +31,13 @@ public sealed class SystemMetricsProvider : ISystemMetricsProvider
         return latestMetric;
     }
 
-    public async Task<ErrorOr<List<SystemMetric>>> GetHistoricalMetricsAsync(
+    public async Task<ErrorOr<IReadOnlyList<IntervalMetricsSummary>>> GetHistoricalMetricsAsync(
         DateTime start,
         DateTime end,
-        int? minIntervalSeconds,
+        int? minBucketSizeSeconds,
         CancellationToken ct = default)
     {
-        var validation = ValidateHistoricalQuery(start, end, minIntervalSeconds);
+        var validation = ValidateHistoricalQuery(start, end, minBucketSizeSeconds);
 
         if (validation.IsError)
         {
@@ -48,13 +50,18 @@ public sealed class SystemMetricsProvider : ISystemMetricsProvider
 
         var metrics = await _metricsRepository.GetHistoricalAsync(start, normalizedEnd, ct);
 
-        if (minIntervalSeconds is null)
+        if (metrics.Count == 0)
         {
-            return metrics;
+            return new List<IntervalMetricsSummary>();
         }
 
-        var downsampled = DownsampleByMinimumInterval(metrics, minIntervalSeconds.Value);
-        return downsampled;
+        var intervalSeconds =
+            minBucketSizeSeconds ?? MinimumBucketSizeSeconds;
+
+        var buckets = BucketByInterval(metrics, intervalSeconds);
+        var summaries = GetIntervalSummaries(buckets);
+
+        return summaries;
     }
 
     private static ErrorOr<Success> ValidateHistoricalQuery(
@@ -85,38 +92,56 @@ public sealed class SystemMetricsProvider : ISystemMetricsProvider
                 description: $"Requested history range cannot exceed {MaxHistoryRange.TotalDays:0} days.");
         }
 
-        if (minIntervalSeconds is < MinimumSamplingIntervalSeconds)
+        if (minIntervalSeconds is < MinimumBucketSizeSeconds)
         {
             return Error.Validation(
                 code: "SystemMetrics.History.InvalidInterval",
-                description: $"'minIntervalSeconds' must be at least {MinimumSamplingIntervalSeconds}.");
+                description: $"'minIntervalSeconds' must be at least {MinimumBucketSizeSeconds}.");
         }
 
         return Result.Success;
     }
 
-    private static List<SystemMetric> DownsampleByMinimumInterval(
-        List<SystemMetric> metrics,
-        int minIntervalSeconds)
+    private static IReadOnlyList<MetricsBucket> BucketByInterval(
+        IEnumerable<SystemMetric> metrics,
+        int intervalSeconds)
     {
-        if (metrics.Count <= 1)
-        {
-            return metrics;
-        }
-
-        var result = new List<SystemMetric>(capacity: metrics.Count);
-        DateTimeOffset? lastIncludedAt = null;
-
-        foreach (var metric in metrics.OrderBy(x => x.CollectedAtUtc))
-        {
-            if (lastIncludedAt is null ||
-                (metric.CollectedAtUtc - lastIncludedAt.Value).TotalSeconds >= minIntervalSeconds)
+        return metrics
+            .OrderBy(x => x.CollectedAtUtc)
+            .GroupBy(x =>
             {
-                result.Add(metric);
-                lastIncludedAt = metric.CollectedAtUtc;
-            }
-        }
+                DateTime.SpecifyKind(x.CollectedAtUtc, DateTimeKind.Utc);
 
-        return result;
+                var unixSeconds =
+                    new DateTimeOffset(x.CollectedAtUtc)
+                        .ToUnixTimeSeconds();
+
+                return unixSeconds / intervalSeconds;
+            })
+            .Select(group =>
+            {
+                var bucketKey = group.Key;
+
+                var bucketStartUnix =
+                    bucketKey * intervalSeconds;
+
+                var bucketStart =
+                    DateTimeOffset.FromUnixTimeSeconds(bucketStartUnix);
+
+                return new MetricsBucket
+                {
+                    Start = bucketStart,
+                    End = bucketStart.AddSeconds(intervalSeconds),
+                    Samples = group.ToList()
+                };
+            })
+            .ToList();
+    }
+
+    private static List<IntervalMetricsSummary> GetIntervalSummaries(IEnumerable<MetricsBucket> buckets)
+    {
+        return buckets
+            .Select(bucket => bucket.ToSummary())
+            .ToList();
     }
 }
