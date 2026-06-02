@@ -1,6 +1,7 @@
 using System.Globalization;
 using ErrorOr;
 using NodePilot.Application.Interfaces.Monitoring;
+using NodePilot.Application.Monitoring.Models;
 using SystemStatusErrors = NodePilot.Application.Monitoring.Errors.Errors;
 
 namespace NodePilot.Application.Monitoring.Services;

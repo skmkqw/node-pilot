@@ -1,5 +1,5 @@
 using ErrorOr;
-using NodePilot.Application.Monitoring;
+using NodePilot.Application.Monitoring.Models;
 
 namespace NodePilot.Application.Interfaces.Monitoring;
 
