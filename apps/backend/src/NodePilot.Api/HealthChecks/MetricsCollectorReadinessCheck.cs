@@ -2,6 +2,7 @@ namespace NodePilot.Api.HealthChecks;
 
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Application.Monitoring;
+using NodePilot.Application.Monitoring.Models;
 
 public sealed class MetricsCollectorReadinessCheck : IHealthCheck
 {
