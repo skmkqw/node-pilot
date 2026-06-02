@@ -3,7 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NodePilot.Application.Interfaces.Common;
 using NodePilot.Application.Interfaces.Monitoring;
-using NodePilot.Application.Monitoring;
+using NodePilot.Application.Monitoring.Models;
 
 namespace NodePilot.Infrastructure.Background;
 

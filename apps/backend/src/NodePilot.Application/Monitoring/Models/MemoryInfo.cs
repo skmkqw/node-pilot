@@ -1,4 +1,4 @@
-namespace NodePilot.Application.Monitoring;
+namespace NodePilot.Application.Monitoring.Models;
 
 public readonly record struct MemoryInfo(
     long TotalMemoryBytes,
