@@ -1,7 +1,7 @@
 using ErrorOr;
 using Microsoft.Extensions.Logging;
 using NodePilot.Application.Interfaces.Monitoring;
-using NodePilot.Application.Monitoring.Settings;
+using NodePilot.Application.Monitoring.Models;
 
 namespace NodePilot.Application.Monitoring.Services;
 

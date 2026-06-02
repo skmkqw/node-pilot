@@ -71,9 +71,13 @@ namespace NodePilot.Infrastructure.Migrations
 
                     b.ToTable("system_metrics", null, t =>
                         {
+                            t.HasCheckConstraint("ck_system_metrics_cpu_disabled_has_no_value", "cpu_enabled OR cpu_usage_percent IS NULL");
+
                             t.HasCheckConstraint("ck_system_metrics_cpu_usage_percent_range", "cpu_usage_percent IS NULL OR (cpu_usage_percent >= 0 AND cpu_usage_percent <= 100)");
 
                             t.HasCheckConstraint("ck_system_metrics_partial_success_shape", "(status != 1 OR (successful_reads > 0 AND successful_reads < total_reads AND failure_reason IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_system_metrics_ram_disabled_has_no_value", "ram_enabled OR ram_usage_percent IS NULL");
 
                             t.HasCheckConstraint("ck_system_metrics_ram_usage_percent_range", "ram_usage_percent IS NULL OR (ram_usage_percent >= 0 AND ram_usage_percent <= 100)");
 
