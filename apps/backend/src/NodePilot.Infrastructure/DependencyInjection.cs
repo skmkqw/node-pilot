@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NodePilot.Application.Interfaces.Common;
 using NodePilot.Application.Interfaces.Monitoring;
-using NodePilot.Application.Monitoring;
+using NodePilot.Application.Monitoring.Models;
 using NodePilot.Application.Monitoring.Settings;
 using NodePilot.Infrastructure.Background;
 using NodePilot.Infrastructure.Configuration;
