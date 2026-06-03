@@ -19,7 +19,7 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = DatabaseExtensions.ResolveConnectionString();
-        
+
         DatabaseExtensions.EnsureSqliteDirectoryExists(connectionString);
 
         services.AddDbContext<NodePilotDbContext>(options =>

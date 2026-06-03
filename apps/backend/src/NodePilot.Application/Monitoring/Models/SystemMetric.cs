@@ -5,7 +5,7 @@ public sealed class SystemMetric
     public long Id { get; init; }
 
     public bool CpuEnabled { get; init; }
- 
+
     public double? CpuUsagePercent { get; set; }
 
     public bool RamEnabled { get; init; }
@@ -19,7 +19,7 @@ public sealed class SystemMetric
     public int SuccessfulReads { get; init; }
 
     public string? FailureReason { get; init; }
-    
+
     public DateTime CollectedAtUtc { get; init; }
 }
 
