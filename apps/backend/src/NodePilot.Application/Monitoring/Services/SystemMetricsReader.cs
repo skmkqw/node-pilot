@@ -9,8 +9,8 @@ namespace NodePilot.Application.Monitoring.Services;
 
 public sealed class SystemMetricsReader : ISystemMetricsReader
 {
-    private const string ProcStatPath = "/proc/stat";
-    private const string ProcMemInfoPath = "/proc/meminfo";
+    private const string _procStatPath = "/proc/stat";
+    private const string _procMemInfoPath = "/proc/meminfo";
 
     public async Task<ErrorOr<double>> ReadCpuUsagePercentAsync(CancellationToken cancellationToken)
     {
@@ -56,15 +56,15 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
 
         try
         {
-            lines = File.ReadAllLines(ProcMemInfoPath);
+            lines = File.ReadAllLines(_procMemInfoPath);
         }
         catch (IOException)
         {
-            return SystemStatusErrors.SystemStatus.MemoryInfoUnavailable(ProcMemInfoPath);
+            return SystemStatusErrors.SystemStatus.MemoryInfoUnavailable(_procMemInfoPath);
         }
         catch (UnauthorizedAccessException)
         {
-            return SystemStatusErrors.SystemStatus.MemoryInfoUnavailable(ProcMemInfoPath);
+            return SystemStatusErrors.SystemStatus.MemoryInfoUnavailable(_procMemInfoPath);
         }
 
         var totalKbResult = ReadMemInfoValueKb(lines, "MemTotal");
@@ -82,7 +82,7 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
 
         if (totalKb <= 0)
         {
-            return SystemStatusErrors.SystemStatus.MemoryTotalInvalid(ProcMemInfoPath);
+            return SystemStatusErrors.SystemStatus.MemoryTotalInvalid(_procMemInfoPath);
         }
 
         long usedKb = totalKb - availableKb;
@@ -102,20 +102,20 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
 
         try
         {
-            firstLine = File.ReadLines(ProcStatPath).FirstOrDefault();
+            firstLine = File.ReadLines(_procStatPath).FirstOrDefault();
         }
         catch (IOException)
         {
-            return SystemStatusErrors.SystemStatus.CpuStatisticsUnavailable(ProcStatPath);
+            return SystemStatusErrors.SystemStatus.CpuStatisticsUnavailable(_procStatPath);
         }
         catch (UnauthorizedAccessException)
         {
-            return SystemStatusErrors.SystemStatus.CpuStatisticsUnavailable(ProcStatPath);
+            return SystemStatusErrors.SystemStatus.CpuStatisticsUnavailable(_procStatPath);
         }
 
         if (string.IsNullOrWhiteSpace(firstLine) || !firstLine.StartsWith("cpu "))
         {
-            return SystemStatusErrors.SystemStatus.CpuStatisticsUnavailable(ProcStatPath);
+            return SystemStatusErrors.SystemStatus.CpuStatisticsUnavailable(_procStatPath);
         }
 
         var rawParts = firstLine
@@ -125,7 +125,7 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
 
         var parts = new ulong[rawParts.Length];
 
-        for (var index = 0; index < rawParts.Length; index++)
+        for (var index = 0 ; index < rawParts.Length ; index++)
         {
             var parsedValueResult = ParseUnsignedLong(rawParts[index]);
 
@@ -137,7 +137,7 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
 
         if (parts.Length < 4)
         {
-            return SystemStatusErrors.SystemStatus.CpuStatisticsFormatInvalid(ProcStatPath);
+            return SystemStatusErrors.SystemStatus.CpuStatisticsFormatInvalid(_procStatPath);
         }
 
         ulong user = parts.ElementAtOrDefault(0);
@@ -162,14 +162,14 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
 
         if (line is null)
         {
-            return SystemStatusErrors.SystemStatus.MemoryInfoKeyMissing(key, ProcMemInfoPath);
+            return SystemStatusErrors.SystemStatus.MemoryInfoKeyMissing(key, _procMemInfoPath);
         }
 
         var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
         if (parts.Length < 2 || !long.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var valueKb))
         {
-            return SystemStatusErrors.SystemStatus.MemoryInfoValueInvalid(key, ProcMemInfoPath);
+            return SystemStatusErrors.SystemStatus.MemoryInfoValueInvalid(key, _procMemInfoPath);
         }
 
         return valueKb;
@@ -179,7 +179,7 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
     {
         if (!ulong.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
         {
-            return SystemStatusErrors.SystemStatus.CpuStatisticValueInvalid(value, ProcStatPath);
+            return SystemStatusErrors.SystemStatus.CpuStatisticValueInvalid(value, _procStatPath);
         }
 
         return parsed;

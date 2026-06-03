@@ -1,5 +1,5 @@
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using NodePilot.Infrastructure.Persistence;
 
 namespace NodePilot.Api.HealthChecks;

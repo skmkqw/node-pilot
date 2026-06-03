@@ -8,9 +8,9 @@ public sealed class MetricsCollectorState
     public DateTimeOffset? LastSuccessfulCollectionUtc { get; private set; }
 
     public DateTimeOffset? LastAttemptUtc { get; private set; }
-    
+
     public string? LastError { get; private set; }
-    
+
     public bool IsRunning { get; private set; }
 
     public void MarkRunning()

@@ -4,5 +4,5 @@ namespace NodePilot.Application.Interfaces.Monitoring;
 
 public interface IMonitoringSettingsProvider
 {
-	MonitoringSettings Current { get; }
+    MonitoringSettings Current { get; }
 }

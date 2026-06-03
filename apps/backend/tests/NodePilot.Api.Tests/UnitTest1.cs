@@ -1,4 +1,4 @@
-﻿namespace NodePilot.Api.Tests;
+namespace NodePilot.Api.Tests;
 
 public class Tests
 {
