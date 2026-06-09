@@ -9,14 +9,14 @@ public sealed class MetricsRetentionService(ISystemMetricsRepository repository)
 
     public async Task<RetentionResult> ApplyRetentionAsync(TimeSpan retention, CancellationToken ct)
     {
-        DateTime startedAtUtc = DateTime.UtcNow;
+        var startedAtUtc = DateTime.UtcNow;
 
-        DateTime cutoff = startedAtUtc - retention;
+        var cutoff = startedAtUtc - retention;
 
-        var deleted =
+        int deleted =
             await _repository.DeleteOlderThanAsync(cutoff, ct);
 
-        DateTime completedAtUtc = DateTime.UtcNow;
+        var completedAtUtc = DateTime.UtcNow;
 
         return new RetentionResult(startedAtUtc, completedAtUtc, cutoff, deleted);
     }

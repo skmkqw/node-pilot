@@ -24,7 +24,7 @@ public sealed class SqliteHealthCheck : IHealthCheck
 
             await using var command = connection.CreateCommand();
             command.CommandText = "SELECT 1;";
-            var result = await command.ExecuteScalarAsync(cancellationToken);
+            object? result = await command.ExecuteScalarAsync(cancellationToken);
 
             return result?.ToString() == "1"
                 ? HealthCheckResult.Healthy(

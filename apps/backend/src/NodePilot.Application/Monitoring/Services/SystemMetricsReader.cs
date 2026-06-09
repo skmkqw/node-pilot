@@ -33,15 +33,15 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
         var first = firstResult.Value;
         var second = secondResult.Value;
 
-        var idleDelta = second.Idle - first.Idle;
-        var totalDelta = second.Total - first.Total;
+        ulong idleDelta = second.Idle - first.Idle;
+        ulong totalDelta = second.Total - first.Total;
 
         if (totalDelta <= 0)
         {
             return 0;
         }
 
-        var usage = 100.0 * (1.0 - ((double)idleDelta / totalDelta));
+        double usage = 100.0 * (1.0 - ((double)idleDelta / totalDelta));
         return Math.Clamp(usage, 0, 100);
     }
 
@@ -118,14 +118,13 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
             return SystemStatusErrors.SystemStatus.CpuStatisticsUnavailable(_procStatPath);
         }
 
-        var rawParts = firstLine
+        string[] rawParts = [.. firstLine
             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Skip(1)
-            .ToArray();
+            .Skip(1)];
 
-        var parts = new ulong[rawParts.Length];
+        ulong[] parts = new ulong[rawParts.Length];
 
-        for (var index = 0 ; index < rawParts.Length ; index++)
+        for (int index = 0 ; index < rawParts.Length ; index++)
         {
             var parsedValueResult = ParseUnsignedLong(rawParts[index]);
 
@@ -158,16 +157,16 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
 
     private static ErrorOr<long> ReadMemInfoValueKb(IEnumerable<string> lines, string key)
     {
-        var line = lines.FirstOrDefault(x => x.StartsWith(key + ":", StringComparison.Ordinal));
+        string? line = lines.FirstOrDefault(x => x.StartsWith(key + ":", StringComparison.Ordinal));
 
         if (line is null)
         {
             return SystemStatusErrors.SystemStatus.MemoryInfoKeyMissing(key, _procMemInfoPath);
         }
 
-        var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        string[] parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-        if (parts.Length < 2 || !long.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var valueKb))
+        if (parts.Length < 2 || !long.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out long valueKb))
         {
             return SystemStatusErrors.SystemStatus.MemoryInfoValueInvalid(key, _procMemInfoPath);
         }
@@ -177,7 +176,7 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
 
     private static ErrorOr<ulong> ParseUnsignedLong(string value)
     {
-        if (!ulong.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+        if (!ulong.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out ulong parsed))
         {
             return SystemStatusErrors.SystemStatus.CpuStatisticValueInvalid(value, _procStatPath);
         }

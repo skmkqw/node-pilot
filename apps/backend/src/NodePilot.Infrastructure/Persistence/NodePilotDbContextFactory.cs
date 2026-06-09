@@ -7,7 +7,7 @@ public sealed class NodePilotDbContextFactory : IDesignTimeDbContextFactory<Node
 {
     public NodePilotDbContext CreateDbContext(string[] args)
     {
-        var connectionString = DatabaseExtensions.ResolveConnectionString();
+        string connectionString = DatabaseExtensions.ResolveConnectionString();
 
         DatabaseExtensions.EnsureSqliteDirectoryExists(connectionString);
 
