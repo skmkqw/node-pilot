@@ -22,10 +22,7 @@ public static class DependencyInjection
 
         DatabaseExtensions.EnsureSqliteDirectoryExists(connectionString);
 
-        services.AddDbContext<NodePilotDbContext>(options =>
-        {
-            options.UseSqlite(connectionString);
-        });
+        services.AddDbContext<NodePilotDbContext>(options => options.UseSqlite(connectionString));
 
         services.AddScoped<ISystemMetricsRepository, SystemMetricsRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -33,6 +30,8 @@ public static class DependencyInjection
         // Background Services
         services.AddHostedService<MetricsSamplingBackgroundService>();
         services.AddSingleton<MetricsCollectorState>();
+
+        services.AddHostedService<MetricsCleanupBackgroundService>();
 
         // Configuration
         services.AddSingleton<IValidator<MonitoringSettings>, MonitoringSettingsValidator>();
