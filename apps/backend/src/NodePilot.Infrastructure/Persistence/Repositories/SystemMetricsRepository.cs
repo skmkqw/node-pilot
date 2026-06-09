@@ -40,4 +40,11 @@ public sealed class SystemMetricsRepository : ISystemMetricsRepository
     {
         await _dbContext.SystemMetrics.AddAsync(systemMetric, ct);
     }
+
+    public async Task<int> DeleteOlderThanAsync(DateTime cutoffUtc, CancellationToken ct = default)
+    {
+        return await _dbContext.SystemMetrics
+            .Where(m => m.CollectedAtUtc < cutoffUtc)
+            .ExecuteDeleteAsync(ct);
+    }
 }

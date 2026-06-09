@@ -10,7 +10,7 @@ public static class DependencyInjection
         services.AddControllers().AddJsonOptions(opts =>
         {
             opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-        });;
+        });
 
         services.AddCors(options =>
         {

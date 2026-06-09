@@ -71,7 +71,7 @@ public sealed class LinuxSystemMetricsCollector : ISystemMetricsCollector
         }
 
         var status = DetermineStatus(totalReads, failedReads);
-        var failureReason = errors.Count > 0
+        string? failureReason = errors.Count > 0
             ? BuildFailureReason(errors)
             : null;
 
