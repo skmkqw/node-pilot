@@ -22,7 +22,7 @@ public sealed class MetricsCleanupBackgroundService(
     {
         while (!ct.IsCancellationRequested)
         {
-            RetentionSettings settings =
+            var settings =
                 _monitoringSettingsProvider.Current.Retention;
 
             try
@@ -57,17 +57,17 @@ public sealed class MetricsCleanupBackgroundService(
 
     private async Task CleanupMetricsAsync(int maxAgeHours, CancellationToken ct)
     {
-        await using AsyncServiceScope scope = _scopeFactory.CreateAsyncScope();
+        await using var scope = _scopeFactory.CreateAsyncScope();
 
-        IMetricsRetentionService retentionService =
+        var retentionService =
             scope.ServiceProvider
                 .GetRequiredService<IMetricsRetentionService>();
 
         var retention = TimeSpan.FromHours(maxAgeHours);
 
-        RetentionResult result = await retentionService.ApplyRetentionAsync(retention, ct);
+        var result = await retentionService.ApplyRetentionAsync(retention, ct);
 
-        TimeSpan duration =
+        var duration =
             result.CompletedAtUtc - result.StartedAtUtc;
 
         _logger.LogInformation(
