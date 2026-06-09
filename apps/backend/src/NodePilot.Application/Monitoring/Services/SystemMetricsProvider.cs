@@ -6,9 +6,9 @@ namespace NodePilot.Application.Monitoring.Services;
 
 public sealed class SystemMetricsProvider : ISystemMetricsProvider
 {
-    private static readonly TimeSpan MaxHistoryRange = TimeSpan.FromDays(7);
+    private static readonly TimeSpan _maxHistoryRange = TimeSpan.FromDays(7);
 
-    private const int MinimumBucketSizeSeconds = 5;
+    private const int _minimumBucketSizeSeconds = 5;
 
     private readonly ISystemMetricsRepository _metricsRepository;
 
@@ -55,8 +55,8 @@ public sealed class SystemMetricsProvider : ISystemMetricsProvider
             return new List<IntervalMetricsSummary>();
         }
 
-        var intervalSeconds =
-            minBucketSizeSeconds ?? MinimumBucketSizeSeconds;
+        int intervalSeconds =
+            minBucketSizeSeconds ?? _minimumBucketSizeSeconds;
 
         var buckets = BucketByInterval(metrics, intervalSeconds);
         var summaries = GetIntervalSummaries(buckets);
@@ -85,18 +85,18 @@ public sealed class SystemMetricsProvider : ISystemMetricsProvider
                 description: "'start' cannot be in the future.");
         }
 
-        if (end - start > MaxHistoryRange)
+        if (end - start > _maxHistoryRange)
         {
             return Error.Validation(
                 code: "SystemMetrics.History.RangeTooLarge",
-                description: $"Requested history range cannot exceed {MaxHistoryRange.TotalDays:0} days.");
+                description: $"Requested history range cannot exceed {_maxHistoryRange.TotalDays:0} days.");
         }
 
-        if (minIntervalSeconds is < MinimumBucketSizeSeconds)
+        if (minIntervalSeconds is < _minimumBucketSizeSeconds)
         {
             return Error.Validation(
                 code: "SystemMetrics.History.InvalidInterval",
-                description: $"'minIntervalSeconds' must be at least {MinimumBucketSizeSeconds}.");
+                description: $"'minIntervalSeconds' must be at least {_minimumBucketSizeSeconds}.");
         }
 
         return Result.Success;
@@ -112,7 +112,7 @@ public sealed class SystemMetricsProvider : ISystemMetricsProvider
             {
                 DateTime.SpecifyKind(x.CollectedAtUtc, DateTimeKind.Utc);
 
-                var unixSeconds =
+                long unixSeconds =
                     new DateTimeOffset(x.CollectedAtUtc)
                         .ToUnixTimeSeconds();
 
@@ -120,9 +120,9 @@ public sealed class SystemMetricsProvider : ISystemMetricsProvider
             })
             .Select(group =>
             {
-                var bucketKey = group.Key;
+                long bucketKey = group.Key;
 
-                var bucketStartUnix =
+                long bucketStartUnix =
                     bucketKey * intervalSeconds;
 
                 var bucketStart =
@@ -140,8 +140,6 @@ public sealed class SystemMetricsProvider : ISystemMetricsProvider
 
     private static List<IntervalMetricsSummary> GetIntervalSummaries(IEnumerable<MetricsBucket> buckets)
     {
-        return buckets
-            .Select(bucket => bucket.ToSummary())
-            .ToList();
+        return [.. buckets.Select(bucket => bucket.ToSummary())];
     }
 }

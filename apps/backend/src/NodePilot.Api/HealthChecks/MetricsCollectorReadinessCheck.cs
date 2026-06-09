@@ -1,12 +1,13 @@
-namespace NodePilot.Api.HealthChecks;
 
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Application.Monitoring;
+using NodePilot.Application.Monitoring;
 using NodePilot.Application.Monitoring.Models;
+
+namespace NodePilot.Api.HealthChecks;
 
 public sealed class MetricsCollectorReadinessCheck : IHealthCheck
 {
-    private static readonly TimeSpan MaxSnapshotAge = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan _maxSnapshotAge = TimeSpan.FromSeconds(30);
 
     private readonly MetricsCollectorState _state;
 
@@ -27,7 +28,7 @@ public sealed class MetricsCollectorReadinessCheck : IHealthCheck
             ["lastSuccessfulCollectionUtc"] = snapshot.LastSuccessfulCollectionUtc?.ToString("O") ?? "never",
             ["lastAttemptUtc"] = snapshot.LastAttemptUtc?.ToString("O") ?? "never",
             ["lastError"] = snapshot.LastError ?? "",
-            ["maxSnapshotAgeSeconds"] = MaxSnapshotAge.TotalSeconds
+            ["maxSnapshotAgeSeconds"] = _maxSnapshotAge.TotalSeconds
         };
 
         if (!snapshot.IsRunning)
@@ -45,7 +46,7 @@ public sealed class MetricsCollectorReadinessCheck : IHealthCheck
         var age = DateTimeOffset.UtcNow - snapshot.LastSuccessfulCollectionUtc.Value;
         data["snapshotAgeSeconds"] = Math.Round(age.TotalSeconds, 2);
 
-        if (age > MaxSnapshotAge)
+        if (age > _maxSnapshotAge)
         {
             return Task.FromResult(
                 HealthCheckResult.Unhealthy("Metrics collector data is stale.", data: data));
