@@ -21,7 +21,7 @@ public class BaseController : ControllerBase
 
     private IActionResult Problem(Error firstError)
     {
-        var statusCode = firstError.Type switch
+        int statusCode = firstError.Type switch
         {
             ErrorType.Conflict => StatusCodes.Status409Conflict,
             ErrorType.NotFound => StatusCodes.Status404NotFound,

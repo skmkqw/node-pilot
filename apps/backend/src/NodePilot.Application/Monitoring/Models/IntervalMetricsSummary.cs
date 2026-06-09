@@ -104,12 +104,12 @@ public sealed class IntervalMetricsSummary
 
         AverageCpuUsagePercent =
             CpuMeasuredSamples > 0
-                ? Math.Round(accumulatedCpuUsagePercent / CpuMeasuredSamples, 2) 
+                ? Math.Round(accumulatedCpuUsagePercent / CpuMeasuredSamples, 2)
                 : null;
 
         AverageRamUsagePercent =
             RamMeasuredSamples > 0
-                ? Math.Round(accumulatedRamUsagePercent / RamMeasuredSamples, 2) 
+                ? Math.Round(accumulatedRamUsagePercent / RamMeasuredSamples, 2)
                 : null;
     }
 }

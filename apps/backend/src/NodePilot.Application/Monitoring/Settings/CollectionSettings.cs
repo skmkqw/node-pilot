@@ -8,7 +8,7 @@ public sealed class CollectionSettings
     // USED
     [ConfigurationKeyName("IntervalSeconds")]
     public int IntervalSeconds { get; init; }
-    
+
     [ConfigurationKeyName("Enabled")]
     public bool Enabled { get; init; }
 
