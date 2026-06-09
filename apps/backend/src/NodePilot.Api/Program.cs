@@ -1,9 +1,9 @@
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using NodePilot.Api;
 using NodePilot.Api.HealthChecks;
 using NodePilot.Application;
 using NodePilot.Infrastructure;
 using NodePilot.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 

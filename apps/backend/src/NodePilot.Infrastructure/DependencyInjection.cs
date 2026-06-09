@@ -18,14 +18,11 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = DatabaseExtensions.ResolveConnectionString();
-        
+        string connectionString = DatabaseExtensions.ResolveConnectionString();
+
         DatabaseExtensions.EnsureSqliteDirectoryExists(connectionString);
 
-        services.AddDbContext<NodePilotDbContext>(options =>
-        {
-            options.UseSqlite(connectionString);
-        });
+        services.AddDbContext<NodePilotDbContext>(options => options.UseSqlite(connectionString));
 
         services.AddScoped<ISystemMetricsRepository, SystemMetricsRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -33,6 +30,8 @@ public static class DependencyInjection
         // Background Services
         services.AddHostedService<MetricsSamplingBackgroundService>();
         services.AddSingleton<MetricsCollectorState>();
+
+        services.AddHostedService<MetricsCleanupBackgroundService>();
 
         // Configuration
         services.AddSingleton<IValidator<MonitoringSettings>, MonitoringSettingsValidator>();

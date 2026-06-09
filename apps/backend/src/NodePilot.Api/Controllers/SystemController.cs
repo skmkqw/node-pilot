@@ -14,7 +14,7 @@ public class SystemController : BaseController
     }
 
     [HttpGet("metrics/current")]
-    public async Task<IActionResult> GetCurrentMetrics(CancellationToken ct = default)
+    public async Task<IActionResult> GetCurrentMetricsAsync(CancellationToken ct = default)
     {
         var getCurrentMetricsResult = await _metricsProvider.GetCurrentMetricsAsync(ct);
 
@@ -22,7 +22,7 @@ public class SystemController : BaseController
     }
 
     [HttpGet("metrics/historical")]
-    public async Task<IActionResult> GetHistoricalMetrics([FromQuery] DateTime start,
+    public async Task<IActionResult> GetHistoricalMetricsAsync([FromQuery] DateTime start,
         [FromQuery] DateTime end,
         [FromQuery] int? minIntervalSeconds,
         CancellationToken ct = default)

@@ -12,13 +12,13 @@ public static class DatabaseExtensions
     {
         var builder = new SqliteConnectionStringBuilder(connectionString);
 
-        var dataSource = builder.DataSource;
+        string dataSource = builder.DataSource;
 
         if (string.IsNullOrWhiteSpace(dataSource))
             throw new InvalidOperationException("SQLite Data Source is missing.");
 
-        var fullPath = Path.GetFullPath(dataSource);
-        var directory = Path.GetDirectoryName(fullPath);
+        string fullPath = Path.GetFullPath(dataSource);
+        string? directory = Path.GetDirectoryName(fullPath);
 
         if (string.IsNullOrWhiteSpace(directory))
             return;
@@ -51,7 +51,7 @@ public static class DatabaseExtensions
     {
         LoadDotEnv();
 
-        var connectionString = Environment.GetEnvironmentVariable("NODE_PILOT_DB_CONNECTION_STRING")?.Trim();
+        string? connectionString = Environment.GetEnvironmentVariable("NODE_PILOT_DB_CONNECTION_STRING")?.Trim();
 
         if (string.IsNullOrEmpty(connectionString))
             throw new InvalidOperationException("Environment variable 'NODE_PILOT_DB_CONNECTION_STRING' is missing.");
@@ -65,7 +65,7 @@ public static class DatabaseExtensions
 
         while (directory is not null)
         {
-            var envPath = Path.Combine(directory.FullName, ".env");
+            string envPath = Path.Combine(directory.FullName, ".env");
 
             if (File.Exists(envPath))
             {

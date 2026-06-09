@@ -10,5 +10,5 @@ public sealed class MetricsBucket
 
     public int Count => Samples.Count;
 
-    public IntervalMetricsSummary ToSummary() => new IntervalMetricsSummary(this);
+    public IntervalMetricsSummary ToSummary() => new(this);
 }

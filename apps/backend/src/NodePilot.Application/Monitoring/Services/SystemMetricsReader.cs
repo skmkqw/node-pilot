@@ -9,8 +9,8 @@ namespace NodePilot.Application.Monitoring.Services;
 
 public sealed class SystemMetricsReader : ISystemMetricsReader
 {
-    private const string ProcStatPath = "/proc/stat";
-    private const string ProcMemInfoPath = "/proc/meminfo";
+    private const string _procStatPath = "/proc/stat";
+    private const string _procMemInfoPath = "/proc/meminfo";
 
     public async Task<ErrorOr<double>> ReadCpuUsagePercentAsync(CancellationToken cancellationToken)
     {
@@ -33,15 +33,15 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
         var first = firstResult.Value;
         var second = secondResult.Value;
 
-        var idleDelta = second.Idle - first.Idle;
-        var totalDelta = second.Total - first.Total;
+        ulong idleDelta = second.Idle - first.Idle;
+        ulong totalDelta = second.Total - first.Total;
 
         if (totalDelta <= 0)
         {
             return 0;
         }
 
-        var usage = 100.0 * (1.0 - ((double)idleDelta / totalDelta));
+        double usage = 100.0 * (1.0 - ((double)idleDelta / totalDelta));
         return Math.Clamp(usage, 0, 100);
     }
 
@@ -56,15 +56,15 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
 
         try
         {
-            lines = File.ReadAllLines(ProcMemInfoPath);
+            lines = File.ReadAllLines(_procMemInfoPath);
         }
         catch (IOException)
         {
-            return SystemStatusErrors.SystemStatus.MemoryInfoUnavailable(ProcMemInfoPath);
+            return SystemStatusErrors.SystemStatus.MemoryInfoUnavailable(_procMemInfoPath);
         }
         catch (UnauthorizedAccessException)
         {
-            return SystemStatusErrors.SystemStatus.MemoryInfoUnavailable(ProcMemInfoPath);
+            return SystemStatusErrors.SystemStatus.MemoryInfoUnavailable(_procMemInfoPath);
         }
 
         var totalKbResult = ReadMemInfoValueKb(lines, "MemTotal");
@@ -82,7 +82,7 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
 
         if (totalKb <= 0)
         {
-            return SystemStatusErrors.SystemStatus.MemoryTotalInvalid(ProcMemInfoPath);
+            return SystemStatusErrors.SystemStatus.MemoryTotalInvalid(_procMemInfoPath);
         }
 
         long usedKb = totalKb - availableKb;
@@ -102,30 +102,29 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
 
         try
         {
-            firstLine = File.ReadLines(ProcStatPath).FirstOrDefault();
+            firstLine = File.ReadLines(_procStatPath).FirstOrDefault();
         }
         catch (IOException)
         {
-            return SystemStatusErrors.SystemStatus.CpuStatisticsUnavailable(ProcStatPath);
+            return SystemStatusErrors.SystemStatus.CpuStatisticsUnavailable(_procStatPath);
         }
         catch (UnauthorizedAccessException)
         {
-            return SystemStatusErrors.SystemStatus.CpuStatisticsUnavailable(ProcStatPath);
+            return SystemStatusErrors.SystemStatus.CpuStatisticsUnavailable(_procStatPath);
         }
 
         if (string.IsNullOrWhiteSpace(firstLine) || !firstLine.StartsWith("cpu "))
         {
-            return SystemStatusErrors.SystemStatus.CpuStatisticsUnavailable(ProcStatPath);
+            return SystemStatusErrors.SystemStatus.CpuStatisticsUnavailable(_procStatPath);
         }
 
-        var rawParts = firstLine
+        string[] rawParts = [.. firstLine
             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-            .Skip(1)
-            .ToArray();
+            .Skip(1)];
 
-        var parts = new ulong[rawParts.Length];
+        ulong[] parts = new ulong[rawParts.Length];
 
-        for (var index = 0; index < rawParts.Length; index++)
+        for (int index = 0 ; index < rawParts.Length ; index++)
         {
             var parsedValueResult = ParseUnsignedLong(rawParts[index]);
 
@@ -137,7 +136,7 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
 
         if (parts.Length < 4)
         {
-            return SystemStatusErrors.SystemStatus.CpuStatisticsFormatInvalid(ProcStatPath);
+            return SystemStatusErrors.SystemStatus.CpuStatisticsFormatInvalid(_procStatPath);
         }
 
         ulong user = parts.ElementAtOrDefault(0);
@@ -158,18 +157,18 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
 
     private static ErrorOr<long> ReadMemInfoValueKb(IEnumerable<string> lines, string key)
     {
-        var line = lines.FirstOrDefault(x => x.StartsWith(key + ":", StringComparison.Ordinal));
+        string? line = lines.FirstOrDefault(x => x.StartsWith(key + ":", StringComparison.Ordinal));
 
         if (line is null)
         {
-            return SystemStatusErrors.SystemStatus.MemoryInfoKeyMissing(key, ProcMemInfoPath);
+            return SystemStatusErrors.SystemStatus.MemoryInfoKeyMissing(key, _procMemInfoPath);
         }
 
-        var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        string[] parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-        if (parts.Length < 2 || !long.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var valueKb))
+        if (parts.Length < 2 || !long.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out long valueKb))
         {
-            return SystemStatusErrors.SystemStatus.MemoryInfoValueInvalid(key, ProcMemInfoPath);
+            return SystemStatusErrors.SystemStatus.MemoryInfoValueInvalid(key, _procMemInfoPath);
         }
 
         return valueKb;
@@ -177,9 +176,9 @@ public sealed class SystemMetricsReader : ISystemMetricsReader
 
     private static ErrorOr<ulong> ParseUnsignedLong(string value)
     {
-        if (!ulong.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+        if (!ulong.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out ulong parsed))
         {
-            return SystemStatusErrors.SystemStatus.CpuStatisticValueInvalid(value, ProcStatPath);
+            return SystemStatusErrors.SystemStatus.CpuStatisticValueInvalid(value, _procStatPath);
         }
 
         return parsed;
