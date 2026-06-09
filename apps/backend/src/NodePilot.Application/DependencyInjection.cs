@@ -12,7 +12,7 @@ public static class DependencyInjection
         services.AddSingleton<ISystemMetricsReader, SystemMetricsReader>();
         services.AddSingleton<ISystemMetricsCollector, LinuxSystemMetricsCollector>();
         services.AddScoped<ISystemMetricsProvider, SystemMetricsProvider>();
-
+        services.AddScoped<IMetricsRetentionService, MetricsRetentionService>();
         return services;
     }
 }
