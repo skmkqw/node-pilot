@@ -17,7 +17,7 @@ public sealed class SystemMetricsRepository : ISystemMetricsRepository
     {
         return await _dbContext.SystemMetrics
             .AsNoTracking()
-            .Where(m => m.Status == MetricCollectionStatus.Success)
+            .Where(m => m.Status != MetricCollectionStatus.ReadFailed)
             .OrderByDescending(m => m.CollectedAtUtc)
             .FirstOrDefaultAsync(ct);
     }

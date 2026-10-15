@@ -110,10 +110,12 @@ public sealed class SystemMetricsProvider : ISystemMetricsProvider
             .OrderBy(x => x.CollectedAtUtc)
             .GroupBy(x =>
             {
-                DateTime.SpecifyKind(x.CollectedAtUtc, DateTimeKind.Utc);
+                // SQLite returns DateTimeKind.Unspecified; treat it as UTC so the
+                // bucket boundaries do not shift by the host's local offset.
+                var collectedAtUtc = DateTime.SpecifyKind(x.CollectedAtUtc, DateTimeKind.Utc);
 
                 long unixSeconds =
-                    new DateTimeOffset(x.CollectedAtUtc)
+                    new DateTimeOffset(collectedAtUtc)
                         .ToUnixTimeSeconds();
 
                 return unixSeconds / intervalSeconds;
