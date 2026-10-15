@@ -1,24 +1,65 @@
 @import "tailwindcss";
 
 :root {
-  --background: #07111f;
-  --foreground: #e2e8f0;
-  --panel: rgba(15, 23, 42, 0.72);
-  --panel-strong: rgba(15, 23, 42, 0.9);
-  --panel-border: rgba(148, 163, 184, 0.18);
-  --muted: #94a3b8;
-  --accent: #22d3ee;
-  --accent-strong: #0f766e;
-  --success: #34d399;
-  --warning: #fbbf24;
+  --background: #04060c;
+  --foreground: #e6edf7;
+  --muted: #8a97ad;
+  --surface: rgba(148, 163, 184, 0.045);
+  --surface-strong: rgba(148, 163, 184, 0.08);
+  --border: rgba(148, 163, 184, 0.12);
+  --border-strong: rgba(148, 163, 184, 0.22);
+
+  --cpu: #22d3ee;
+  --ram: #a78bfa;
+  --temp: #fb923c;
+  --disk: #34d399;
+  --shield: #38bdf8;
   --danger: #fb7185;
+  --warning: #fbbf24;
+  --success: #34d399;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-cpu: var(--cpu);
+  --color-ram: var(--ram);
+  --color-temp: var(--temp);
+  --color-disk: var(--disk);
+  --color-shield: var(--shield);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --animate-aurora-1: aurora-1 22s ease-in-out infinite;
+  --animate-aurora-2: aurora-2 28s ease-in-out infinite;
+  --animate-aurora-3: aurora-3 34s ease-in-out infinite;
+  --animate-shimmer: shimmer 2.2s linear infinite;
+  --animate-ping-slow: ping-slow 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+
+  @keyframes aurora-1 {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    50% { transform: translate3d(12vw, 8vh, 0) scale(1.15); }
+  }
+  @keyframes aurora-2 {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1.1); }
+    50% { transform: translate3d(-10vw, 12vh, 0) scale(0.9); }
+  }
+  @keyframes aurora-3 {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(0.95); }
+    50% { transform: translate3d(6vw, -10vh, 0) scale(1.2); }
+  }
+  @keyframes shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+  }
+  @keyframes ping-slow {
+    75%, 100% { transform: scale(2.4); opacity: 0; }
+  }
 }
 
 * {
@@ -26,18 +67,98 @@
 }
 
 html {
-  background:
-    radial-gradient(circle at top left, rgba(34, 211, 238, 0.14), transparent 28%),
-    radial-gradient(circle at top right, rgba(59, 130, 246, 0.18), transparent 24%),
-    linear-gradient(180deg, #081120 0%, #0a1324 55%, #050b15 100%);
+  background: var(--background);
+  color-scheme: dark;
 }
 
 body {
   color: var(--foreground);
+  /* Transparent so the fixed aurora layer (z-index -10) shows through; html holds the base colour. */
   background: transparent;
-  font-family: var(--font-geist-sans), sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-a {
-  color: inherit;
+::selection {
+  background: color-mix(in oklab, var(--cpu) 35%, transparent);
+}
+
+/* Thin, unobtrusive scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+}
+
+/* Component classes live in a layer so Tailwind utilities (e.g. `fixed`) can override them. */
+@layer components {
+  /* Glass surface used by every card */
+  .glass {
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
+      rgba(9, 13, 24, 0.62);
+    border: 1px solid var(--border);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 24px 60px -24px rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+  }
+
+  /* Cursor-following highlight; --spot-x/--spot-y are set from JS */
+  .spotlight::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 300ms ease;
+    background: radial-gradient(
+      420px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      color-mix(in oklab, var(--spot-color, #ffffff) 9%, transparent),
+      transparent 60%
+    );
+  }
+  .spotlight:hover::before {
+    opacity: 1;
+  }
+
+  /* Subtle grid + film grain over the aurora */
+  .grid-overlay {
+    background-image:
+      linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse at 50% 0%, black 20%, transparent 75%);
+  }
+  .grain {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+  }
+
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(148, 163, 184, 0.06) 0%,
+      rgba(148, 163, 184, 0.14) 50%,
+      rgba(148, 163, 184, 0.06) 100%
+    );
+    background-size: 200% 100%;
+    animation: var(--animate-shimmer);
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-aurora-1,
+  .animate-aurora-2,
+  .animate-aurora-3,
+  .skeleton {
+    animation: none;
+  }
 }

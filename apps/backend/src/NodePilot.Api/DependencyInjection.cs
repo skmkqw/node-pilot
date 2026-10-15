@@ -1,28 +1,38 @@
 using System.Text.Json.Serialization;
+using NodePilot.Api.Auth;
+using NodePilot.Api.Cors;
+using NodePilot.Api.Files;
 using NodePilot.Api.HealthChecks;
 
 namespace NodePilot.Api;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddPresentation(this IServiceCollection services)
+    public static IServiceCollection AddPresentation(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddControllers().AddJsonOptions(opts =>
         {
             opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
         });
 
+        services.AddCookieAuthentication(configuration);
+        services.AddLoginRateLimiting();
+        services.AddUploadLimits();
+        services.AddContentTypes();
+
+        var corsSettings = configuration
+            .GetSection(CorsSettings.SectionName)
+            .Get<CorsSettings>() ?? new CorsSettings();
+
         services.AddCors(options =>
         {
             options.AddPolicy("WebClient", policy =>
             {
                 policy
-                    .WithOrigins(
-                        "http://localhost:3000",
-                        "http://192.168.1.20:3000"
-                    )
+                    .SetIsOriginAllowed(origin => OriginPolicy.IsAllowed(origin, corsSettings))
                     .AllowAnyHeader()
-                    .AllowAnyMethod();
+                    .AllowAnyMethod()
+                    .AllowCredentials();
             });
         });
 
