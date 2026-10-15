@@ -17,7 +17,10 @@ public sealed class FileManagerService : IFileManagerService
         RecurseSubdirectories = false,
     };
 
+    private const int _maxSymlinkHops = 40;
+
     private readonly string _root;
+    private readonly string _realRoot;
     private readonly ILogger<FileManagerService> _logger;
 
     public FileManagerService(
@@ -28,6 +31,9 @@ public sealed class FileManagerService : IFileManagerService
         _logger = logger;
 
         Directory.CreateDirectory(_root);
+
+        // The root itself may be a symlink (e.g. /data -> /mnt/disk); compare real paths.
+        _realRoot = GetRealPath(_root);
     }
 
     public ErrorOr<DirectoryListing> List(string? path)
@@ -50,7 +56,7 @@ public sealed class FileManagerService : IFileManagerService
         {
             var entries = new DirectoryInfo(fullPath)
                 .EnumerateFileSystemInfos("*", _listingOptions)
-                .Where(info => SafePathResolver.IsWithinRoot(_root, ResolveLinkTarget(info)))
+                .Where(info => IsReallyWithinRoot(info.FullName))
                 .Select(ToEntry)
                 .OrderBy(entry => entry.Kind != FileKind.Directory)
                 .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
@@ -226,13 +232,9 @@ public sealed class FileManagerService : IFileManagerService
             return resolved.Errors;
         }
 
-        // A symlink inside the root could point anywhere; only follow it if its target
-        // also lies inside the root.
-        FileSystemInfo info = Directory.Exists(resolved.Value)
-            ? new DirectoryInfo(resolved.Value)
-            : new FileInfo(resolved.Value);
-
-        return SafePathResolver.IsWithinRoot(_root, ResolveLinkTarget(info))
+        // A symlink anywhere along the path could point outside the root, so the fully
+        // resolved (real) path must lie inside the real root as well.
+        return IsReallyWithinRoot(resolved.Value)
             ? resolved.Value
             : FileErrors.OutsideRoot;
     }
@@ -271,19 +273,48 @@ public sealed class FileManagerService : IFileManagerService
         return fullPath;
     }
 
-    private static string ResolveLinkTarget(FileSystemInfo info)
+    private bool IsReallyWithinRoot(string fullPath)
     {
         try
         {
-            return info.LinkTarget is null
-                ? info.FullName
-                : info.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? info.FullName;
+            return SafePathResolver.IsWithinRoot(_realRoot, GetRealPath(fullPath));
         }
         catch (IOException)
         {
-            // Broken or cyclic link: treat it as pointing to itself so it is still listed.
-            return info.FullName;
+            // Cyclic or unreadable links are treated as unsafe.
+            return false;
         }
+    }
+
+    /// <summary>
+    /// Resolves every symbolic link along <paramref name="fullPath"/>, like realpath(3).
+    /// Components that do not exist yet (e.g. an upload target) are kept as they are.
+    /// </summary>
+    private static string GetRealPath(string fullPath, int hops = 0)
+    {
+        string root = Path.GetPathRoot(fullPath)!;
+        string current = root;
+
+        foreach (string part in fullPath[root.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string next = Path.Combine(current, part);
+            string? linkTarget = new FileInfo(next).LinkTarget;
+
+            if (linkTarget is not null)
+            {
+                if (hops >= _maxSymlinkHops)
+                {
+                    throw new IOException($"Too many levels of symbolic links in '{fullPath}'.");
+                }
+
+                // Relative targets are relative to the directory containing the link.
+                next = GetRealPath(Path.GetFullPath(linkTarget, current), hops + 1);
+            }
+
+            current = next;
+        }
+
+        return Path.TrimEndingDirectorySeparator(current);
     }
 
     private FileEntry ToEntry(FileSystemInfo info)
