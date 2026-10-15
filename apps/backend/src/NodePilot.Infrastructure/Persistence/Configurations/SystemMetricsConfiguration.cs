@@ -21,6 +21,9 @@ public class SystemMetricsConfiguration : IEntityTypeConfiguration<SystemMetric>
         // Timestamp
         builder.Property(x => x.CollectedAtUtc)
             .HasColumnName("collected_at_utc")
+            .HasConversion(
+                value => value,
+                value => DateTime.SpecifyKind(value, DateTimeKind.Utc))
             .IsRequired();
 
         // Metrics read status
