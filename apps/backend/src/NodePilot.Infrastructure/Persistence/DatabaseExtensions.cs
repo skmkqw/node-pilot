@@ -59,7 +59,11 @@ public static class DatabaseExtensions
         return connectionString;
     }
 
-    private static void LoadDotEnv()
+    /// <summary>
+    /// Loads the nearest <c>.env</c> file into the process environment without overriding
+    /// variables that are already set (e.g. by Docker Compose or the test host).
+    /// </summary>
+    public static void LoadDotEnv()
     {
         var directory = new DirectoryInfo(Directory.GetCurrentDirectory());
 
@@ -69,7 +73,7 @@ public static class DatabaseExtensions
 
             if (File.Exists(envPath))
             {
-                Env.Load(envPath);
+                Env.NoClobber().Load(envPath);
                 return;
             }
 
