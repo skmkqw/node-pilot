@@ -5,11 +5,15 @@ using NodePilot.Application;
 using NodePilot.Infrastructure;
 using NodePilot.Infrastructure.Persistence;
 
+// Load .env before the builder snapshots environment variables into configuration,
+// so settings such as Auth__Password can be provided through the .env file.
+DatabaseExtensions.LoadDotEnv();
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services
     .AddApplication()
-    .AddPresentation()
+    .AddPresentation(builder.Configuration)
     .AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
@@ -26,3 +30,5 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 await app.Services.InitializeDatabaseAsync();
 
 app.Run();
+
+public partial class Program;
