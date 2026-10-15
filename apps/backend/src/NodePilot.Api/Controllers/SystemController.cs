@@ -8,9 +8,20 @@ public class SystemController : BaseController
 {
     private readonly ISystemMetricsProvider _metricsProvider;
 
-    public SystemController(ISystemMetricsProvider metricsProvider)
+    private readonly ISystemOverviewProvider _overviewProvider;
+
+    public SystemController(
+        ISystemMetricsProvider metricsProvider,
+        ISystemOverviewProvider overviewProvider)
     {
         _metricsProvider = metricsProvider;
+        _overviewProvider = overviewProvider;
+    }
+
+    [HttpGet("overview")]
+    public IActionResult GetOverview()
+    {
+        return Ok(_overviewProvider.GetOverview());
     }
 
     [HttpGet("metrics/current")]
