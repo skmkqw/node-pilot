@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using NodePilot.Api.Auth;
 using NodePilot.Api.HealthChecks;
 
 namespace NodePilot.Api;
@@ -11,6 +12,8 @@ public static class DependencyInjection
         {
             opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
         });
+
+        services.AddCookieAuthentication(configuration);
 
         services.AddCors(options =>
         {
