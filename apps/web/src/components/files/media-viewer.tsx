@@ -21,11 +21,12 @@ export function MediaViewer({ items, index, onIndexChange }: MediaViewerProps) {
 	const current = index !== null ? items[index] ?? null : null;
 	// Keep rendering the last item while the modal animates out.
 	const [lastItem, setLastItem] = useState<FileEntry | null>(null);
-	const item = current ?? lastItem;
 
-	useEffect(() => {
-		if (current) setLastItem(current);
-	}, [current]);
+	if (current && current !== lastItem) {
+		setLastItem(current);
+	}
+
+	const item = current ?? lastItem;
 
 	const close = useCallback(() => onIndexChange(null), [onIndexChange]);
 
