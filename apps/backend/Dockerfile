@@ -2,6 +2,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 COPY src/NodePilot.Application/NodePilot.Application.csproj src/NodePilot.Application/
+COPY src/NodePilot.Infrastructure/NodePilot.Infrastructure.csproj src/NodePilot.Infrastructure/
 COPY src/NodePilot.Api/NodePilot.Api.csproj src/NodePilot.Api/
 RUN dotnet restore src/NodePilot.Api/NodePilot.Api.csproj
 
@@ -16,6 +17,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 ENV ASPNETCORE_URLS=http://+:8080
+RUN mkdir -p /app/data /files
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
