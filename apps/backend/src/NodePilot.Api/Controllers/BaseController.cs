@@ -1,6 +1,7 @@
 using ErrorOr;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using NodePilot.Application.Common;
 
 namespace NodePilot.Api.Controllers;
 
@@ -21,6 +22,11 @@ public class BaseController : ControllerBase
 
     private IActionResult Problem(Error firstError)
     {
+        if (firstError.NumericType == CustomErrorTypes.Upstream)
+        {
+            return Problem(statusCode: StatusCodes.Status502BadGateway, title: firstError.Description);
+        }
+
         int statusCode = firstError.Type switch
         {
             ErrorType.Conflict => StatusCodes.Status409Conflict,
