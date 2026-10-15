@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using NodePilot.Api.Auth;
 using NodePilot.Api.Cors;
+using NodePilot.Api.Files;
 using NodePilot.Api.HealthChecks;
 
 namespace NodePilot.Api;
@@ -16,6 +17,7 @@ public static class DependencyInjection
 
         services.AddCookieAuthentication(configuration);
         services.AddLoginRateLimiting();
+        services.AddUploadLimits();
 
         var corsSettings = configuration
             .GetSection(CorsSettings.SectionName)
