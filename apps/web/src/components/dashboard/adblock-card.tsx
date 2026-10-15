@@ -71,14 +71,17 @@ export function AdBlockCard() {
 				) : null}
 			</div>
 
-			<AnimatePresence mode="wait" initial={false}>
-				{!data ? (
-					<motion.div key="loading" exit={{ opacity: 0 }} className="mt-5 grid grid-cols-2 gap-3">
-						{Array.from({ length: 4 }).map((_, index) => (
-							<div key={index} className="skeleton h-16 rounded-2xl" />
-						))}
-					</motion.div>
-				) : !data.configured ? (
+			{/* The skeleton sits outside AnimatePresence so real content never waits for its exit. */}
+			{!data ? (
+				<div className="mt-5 grid grid-cols-2 gap-3">
+					{Array.from({ length: 4 }).map((_, index) => (
+						<div key={index} className="skeleton h-16 rounded-2xl" />
+					))}
+				</div>
+			) : null}
+
+			<AnimatePresence mode="popLayout" initial={false}>
+				{!data ? null : !data.configured ? (
 					<NotConfigured key="not-configured" />
 				) : !data.reachable ? (
 					<motion.div
