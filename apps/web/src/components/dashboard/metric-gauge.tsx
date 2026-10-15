@@ -37,6 +37,12 @@ const DEFAULT_LABELS: Record<Severity, string> = {
 	critical: "Critical",
 };
 
+const SEVERITY_DOTS: Record<Severity, string> = {
+	ok: "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]",
+	warn: "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)]",
+	critical: "bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.9)]",
+};
+
 const SEVERITY_STYLES: Record<Severity, string> = {
 	ok: "border-emerald-300/20 bg-emerald-400/10 text-emerald-200",
 	warn: "border-amber-300/25 bg-amber-400/10 text-amber-200",
@@ -82,20 +88,26 @@ export function MetricGauge({
 
 	return (
 		<Card glow={color} className="p-5" variants={gaugeVariants}>
-			<div className="flex items-center justify-between">
-				<div className="flex items-center gap-2.5 text-sm font-medium text-slate-200">
+			<div className="flex items-center justify-between gap-2">
+				<div className="flex min-w-0 items-center gap-2.5 text-sm font-medium text-slate-200">
 					<span
 						className="grid size-8 place-items-center rounded-xl border border-white/10"
 						style={{ color, background: `color-mix(in oklab, ${color} 14%, transparent)` }}
 					>
 						{icon}
 					</span>
-					{label}
+					<span className="truncate">{label}</span>
 				</div>
 				{available ? (
 					<span
+						aria-hidden
+						className={cn("size-2 shrink-0 rounded-full transition-colors duration-500 sm:hidden", SEVERITY_DOTS[severity])}
+					/>
+				) : null}
+				{available ? (
+					<span
 						className={cn(
-							"rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.14em] transition-colors duration-500",
+							"hidden shrink-0 rounded-full border px-2 py-0.5 sm:inline text-[0.65rem] font-semibold uppercase tracking-[0.14em] transition-colors duration-500",
 							SEVERITY_STYLES[severity],
 						)}
 					>
