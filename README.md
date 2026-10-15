@@ -1,160 +1,127 @@
 # NodePilot
 
-NodePilot is a unified control panel for managing a home server.
+NodePilot is a lightweight, unified control panel for a home server. One web app, reachable from any device in your home network, replaces the terminal and the separate admin panels for the everyday jobs:
 
-This repository is a monorepo containing:
+| Feature | What it does |
+|---|---|
+| **Live dashboard** | CPU, memory, CPU temperature and disk usage as animated gauges, a performance history chart (15 min – 24 h), uptime, load average and host details. |
+| **Files & media** | Browse a sandboxed folder on the server, upload (drag & drop), create folders, download and delete files. |
+| **Video player** | Stream MP4, WebM, MOV and OGV videos (plus audio and images) right in the browser, with seeking via HTTP range requests. |
+| **Ad blocking** | Pi-hole (v6) integration: see today's statistics and switch network-wide blocking on/off or pause it for 5 min – 1 h. |
+| **Sign-in** | A single administrator account protected by an HTTP-only session cookie and login rate limiting. |
 
-- A .NET backend server agent
-- A Next.js web client
-
-## Monorepo Structure
+## Monorepo structure
 
 ```text
 nodepilot/
 ├─ apps/
-│  ├─ backend/     # ASP.NET Core Web API
-│  └─ web/         # Next.js web application
-├─ .gitignore
-├─ .env.example
+│  ├─ backend/                 # ASP.NET Core Web API (.NET 10)
+│  │  ├─ src/NodePilot.Api             # controllers, auth, CORS, health checks
+│  │  ├─ src/NodePilot.Application     # domain models, services, interfaces
+│  │  ├─ src/NodePilot.Infrastructure  # EF Core + SQLite, background jobs, Pi-hole client
+│  │  └─ tests/NodePilot.Api.Tests     # unit + integration tests (NUnit)
+│  └─ web/                     # Next.js 16 / React 19 client (Tailwind 4, Motion)
+├─ documents/                  # API reference, metrics notes, mockups, Postman
 ├─ compose.yaml
-└─ README.md
+└─ .env.example
 ```
 
-## Tech Stack
+## Tech stack
 
-- Backend: .NET (ASP.NET Core Web API)
-- Frontend: Next.js (React, TypeScript)
-- Container orchestration: Docker Compose
-- Architecture: Client-server (REST API, JSON)
+- **Backend:** ASP.NET Core (.NET 10), EF Core 10 + SQLite, ErrorOr, FluentValidation, cookie authentication, rate limiting
+- **Frontend:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, Motion, Lucide icons
+- **Deployment:** Docker Compose
+- **Architecture:** client–server (REST, JSON), layered backend (Api → Application ← Infrastructure)
 
 ## Requirements
 
-Make sure you have installed:
-
 - .NET SDK 10.0
-- Node.js 20+
-- npm (comes with Node.js)
-- Docker Desktop or Docker Engine with Compose
-- Git
+- Node.js **20.9+** (required by Next.js 16)
+- Docker Engine with Compose (optional)
+- Linux host (system metrics are read from `/proc` and `/sys`)
 
-## Environment Variables
+## Configuration
 
-### Global Reference
-
-See `.env.example` in the repository root.
-
-Configurable variables:
-
-- `NODE_ENV`: runtime mode passed to the web container by Compose. Default: `production`
-- `ASPNETCORE_ENVIRONMENT`: ASP.NET Core environment passed to the backend container by Compose. Default: `Development`
-- `BACKEND_PORT`: host port mapped to the backend container's internal port `8080`. Default: `5000`
-- `WEB_PORT`: host port mapped to the web container's internal port `3000`. Default: `3000`
-- `NEXT_PUBLIC_API_URL`: public backend URL compiled into the web app and also provided to the web container at runtime. Default: `http://localhost:5000`
-
-Container-internal variables used by Docker setup:
-
-- `ASPNETCORE_URLS`: fixed to `http://+:8080` inside the backend container
-- `PORT`: fixed to `3000` inside the web container
-- `HOSTNAME`: fixed to `0.0.0.0` inside the web container so the server is reachable by Docker health checks
-
-Precedence when running `docker compose`:
-
-1. Shell environment variables in the terminal where you run Compose
-2. Values from the repository-root `.env` file
-3. The fallback defaults written in `compose.yaml` like `${WEB_PORT:-3000}`
-
-### Web (Next.js)
-
-For local non-Docker development, copy the example file:
-
-```bash
-cd apps/web
-cp .env.local.example .env.local
-```
-
-Default value:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:5000
-```
-
-## Running The Project Locally
-
-You can run the apps directly with the native toolchains or together with Docker Compose.
-
-### Option 1. Start with Docker Compose
-
-From the repository root:
+Copy the example file and **set a password**:
 
 ```bash
 cp .env.example .env
+```
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `Auth__Username` | Administrator login | `admin` |
+| `Auth__Password` | Administrator password (min. 8 characters) | — (required) |
+| `NODE_PILOT_DB_CONNECTION_STRING` | SQLite connection string for local runs | `Data Source=data/nodepilot.db` |
+| `PiHole__BaseUrl` | Pi-hole v6 address, e.g. `http://192.168.1.2`. Empty disables the integration. | empty |
+| `PiHole__Password` | Pi-hole app password | empty |
+| `NODEPILOT_FILES_DIR` | Host folder shown in the file manager (Docker Compose) | `./data/files` |
+| `NEXT_PUBLIC_API_URL` | Backend URL used by the browser. Empty = same host, port 5000. | empty |
+| `BACKEND_PORT` / `WEB_PORT` | Published ports | `5000` / `3000` |
+
+Further settings live in `apps/backend/src/NodePilot.Api/appsettings.json`:
+
+- `Monitoring`: sampling interval, retention, which metrics to collect
+- `FileManager`: `RootPath` (the only directory the file manager can access) and `MaxUploadMegabytes`
+- `Cors`: allowed origins; `AllowPrivateNetworkOrigins` lets devices in the LAN use the panel
+- `Auth:SessionLifetimeHours`
+
+Every section is validated at startup, and the app refuses to start with a clear message if something is missing.
+
+## Running
+
+### Option 1: Docker Compose
+
+```bash
+cp .env.example .env    # then edit Auth__Password
 docker compose up --build
 ```
 
-The services will be available at:
+- Web: <http://localhost:3000> (or `http://<server-ip>:3000` from your phone)
+- Backend: <http://localhost:5000>, health check at `/health`
 
-```text
-Web:     http://localhost:3000
-Backend: http://localhost:5000
-```
+The metrics database is kept in the `nodepilot-data` volume, and `NODEPILOT_FILES_DIR` is mounted as the file manager root.
 
-Container health checks:
-
-- Backend: `GET /health`
-- Web: `GET /api/health`
-
-The web service waits for the backend service to become healthy before starting.
-
-### Option 2. Start the Backend (.NET API)
+### Option 2: Run the apps natively
 
 ```bash
+# backend
 cd apps/backend/src/NodePilot.Api
-dotnet restore
 dotnet run
-```
 
-By default, the API will be available at:
-
-```text
-http://localhost:5000
-```
-
-Endpoint:
-
-```text
-GET /health
-```
-
-- `/health` runs three backend health checks and returns a JSON response with the overall health status, total execution time, and per-check details.
-- Registered checks:
-  - `system_status`: reports basic process and host metadata such as OS, processor count, and .NET runtime version.
-  - `database_status`: verifies the SQLite database is reachable by opening a connection and executing `SELECT 1`.
-  - `metrics_collector`: verifies the background metrics sampler is running and that it has produced a recent successful sample.
-- `metrics_collector` is reported as unhealthy when the sampler is not running, has not completed a successful collection yet, or its latest successful sample is older than 30 seconds.
-
-### Option 3. Start the Web App (Next.js)
-
-In a new terminal:
-
-```bash
+# web (in a second terminal)
 cd apps/web
 npm install
 npm run dev
 ```
 
-Open in your browser:
+Open <http://localhost:3000> and sign in with the credentials from `.env`.
 
-```text
-http://localhost:3000
+## Tests
+
+```bash
+cd apps/backend
+dotnet test
 ```
 
-## Verification Checklist
+The suite has unit tests (path traversal protection, symlink escapes, Linux parsers, CORS policy, Pi-hole client against a fake API, UTC bucketing) and integration tests that host the real API in memory (authentication, file upload / range streaming / delete, access control).
 
-After setup, confirm that:
+```bash
+cd apps/web
+npm run lint
+npm run build
+```
 
-- `docker compose up --build` starts both services successfully
-- `http://localhost:5000/health` returns a healthy JSON response
-- `http://localhost:3000/api/health` returns `{ "status": "ok" }`
-- The frontend loads at `http://localhost:3000`
+## Security notes
 
-The backend health response includes a top-level `status`, `totalDuration`, and a `checks` array. Each item in `checks` includes `name`, `status`, `description`, `duration`, `tags`, and `data`.
+- All `/api/*` endpoints require a signed-in user; only `/health` is public.
+- Sessions use an HTTP-only, `SameSite=Lax` cookie; login is limited to 5 attempts per minute per IP.
+- The file manager is restricted to `FileManager:RootPath`. Paths are normalised and every symlink along a path is resolved, so `..` sequences and links pointing outside the root are rejected (403).
+- NodePilot does not execute shell commands.
+- For access from outside the home network, put it behind a VPN or a reverse proxy with HTTPS.
+
+## Documentation
+
+- [API reference](documents/api.md)
+- [System metrics collection](documents/system-metrics.md)
+- [UI mockups](documents/mockups)
