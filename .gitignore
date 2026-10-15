@@ -532,3 +532,6 @@ next-env.d.ts
 
 # NodePilot runtime data (SQLite database, file manager root)
 apps/backend/src/NodePilot.Api/data/
+
+# Docker Compose file manager root
+/data/
