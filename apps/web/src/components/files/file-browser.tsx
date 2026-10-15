@@ -99,7 +99,7 @@ export function FileBrowser({ path }: { path: string }) {
 		} else if (isViewable(entry)) {
 			setViewerIndex(viewable.indexOf(entry));
 		} else {
-			window.location.href = filesApi.contentUrl(entry.path, true);
+			window.location.assign(filesApi.contentUrl(entry.path, true));
 		}
 	};
 
