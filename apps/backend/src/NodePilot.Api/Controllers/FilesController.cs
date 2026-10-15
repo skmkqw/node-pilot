@@ -1,5 +1,7 @@
 using ErrorOr;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
+using NodePilot.Api.Files;
 using NodePilot.Application.Files.Models;
 using NodePilot.Application.Interfaces.Files;
 
@@ -10,15 +12,44 @@ public class FilesController : BaseController
 {
     private readonly IFileManagerService _fileManager;
 
-    public FilesController(IFileManagerService fileManager)
+    private readonly IContentTypeProvider _contentTypes;
+
+    public FilesController(IFileManagerService fileManager, IContentTypeProvider contentTypes)
     {
         _fileManager = fileManager;
+        _contentTypes = contentTypes;
     }
 
     [HttpGet]
     public IActionResult List([FromQuery] string? path)
     {
         return _fileManager.List(path).Match(onValue: Ok, onError: Problem);
+    }
+
+    /// <summary>
+    /// Streams a file. Range requests are honoured (206 Partial Content), which lets the
+    /// browser's video player seek without downloading the whole file first.
+    /// </summary>
+    [HttpGet("content")]
+    public IActionResult GetContent([FromQuery] string? path, [FromQuery] bool download = false)
+    {
+        var result = _fileManager.GetFile(path);
+
+        if (result.IsError)
+        {
+            return Problem(result.Errors);
+        }
+
+        var file = result.Value;
+
+        if (!_contentTypes.TryGetContentType(file.Name, out string? contentType))
+        {
+            contentType = ContentTypeExtensions.FallbackContentType;
+        }
+
+        return download
+            ? PhysicalFile(file.FullPath, contentType, file.Name, enableRangeProcessing: true)
+            : PhysicalFile(file.FullPath, contentType, enableRangeProcessing: true);
     }
 
     [HttpPost("directories")]
