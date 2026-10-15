@@ -20,12 +20,15 @@ var app = builder.Build();
 
 app.UseCors("WebClient");
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapControllers();
 
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     ResponseWriter = HealthCheckResponseWriter.WriteAsync,
-});
+}).AllowAnonymous();
 
 await app.Services.InitializeDatabaseAsync();
 
