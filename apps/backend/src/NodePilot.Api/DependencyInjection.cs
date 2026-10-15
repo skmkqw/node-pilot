@@ -15,6 +15,7 @@ public static class DependencyInjection
         });
 
         services.AddCookieAuthentication(configuration);
+        services.AddLoginRateLimiting();
 
         var corsSettings = configuration
             .GetSection(CorsSettings.SectionName)

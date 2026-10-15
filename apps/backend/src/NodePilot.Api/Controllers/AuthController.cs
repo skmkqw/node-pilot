@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using NodePilot.Api.Auth;
 
@@ -21,6 +22,7 @@ public class AuthController : BaseController
     }
 
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingExtensions.LoginPolicy)]
     [HttpPost("login")]
     public async Task<IActionResult> LoginAsync([FromBody] LoginRequest request)
     {
