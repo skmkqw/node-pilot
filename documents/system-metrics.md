@@ -15,29 +15,17 @@ The service only supports Linux. If the application runs on a different operatin
 
 ## High-level flow
 
-There are two metrics flows:
+There are three metrics flows:
 
-1. `GET /api/system/status` reads the current status on demand.
-2. `MetricsSamplingBackgroundService` collects and persists a metrics sample in the background.
+1. `MetricsSamplingBackgroundService` collects and persists a CPU/RAM sample every `Monitoring:Collection:IntervalSeconds` (default 15 s).
+2. `GET /api/system/metrics/current` and `GET /api/system/metrics/historical` read the persisted samples.
+3. `GET /api/system/overview` reads live, non-persisted host information on demand (uptime, load average, memory, CPU temperature, disk usage). See `SystemOverviewProvider`.
 
-### Live status read
-
-`SystemController.GetSystemStatus` calls `ISystemMetricsReader.ReadSystemStatusAsync`, implemented by `SystemMetricsReader`.
-
-`ReadSystemStatusAsync` performs these steps:
-
-1. Verifies that the current OS is Linux.
-2. Reads CPU counters from `/proc/stat`.
-3. Waits 300 ms.
-4. Reads CPU counters from `/proc/stat` again.
-5. Calculates CPU usage from the difference between the two snapshots.
-6. Reads memory values from `/proc/meminfo`.
-7. Maps the calculated values into the `SystemStatus` response object.
-8. Rounds the percentage fields to 2 decimal places.
+CPU usage is measured by `SystemMetricsReader.ReadCpuUsagePercentAsync`, which reads `/proc/stat` twice, 300 ms apart, and calculates usage from the difference. Memory is read from `/proc/meminfo` by `ReadMemoryInfo`.
 
 ### Background sampling and persistence
 
-`MetricsSamplingBackgroundService` is registered as a hosted service in infrastructure. It starts with an immediate collection cycle, then repeats every 5 seconds with `PeriodicTimer`.
+`MetricsSamplingBackgroundService` is registered as a hosted service in infrastructure. It starts with an immediate collection cycle, then repeats every `Monitoring:Collection:IntervalSeconds` with `PeriodicTimer`.
 
 Each cycle performs these steps:
 
@@ -73,10 +61,11 @@ Background samples are stored as `SystemMetric` rows in the `system_metrics` tab
 - `FailureReason` / `failure_reason`: Error code for a failed read, capped at 500 characters, or `NULL` for success.
 - `CollectedAtUtc` / `collected_at_utc`: UTC timestamp captured when the collector started the sample.
 
-`MetricCollectionStatus` currently has these values:
+`MetricCollectionStatus` currently has these values (stored as integers, returned by the API as strings):
 
-- `Success` (`0`)
-- `ReadFailed` (`1`)
+- `Success` (`0`): every enabled metric was read
+- `PartialSuccess` (`1`): some enabled metrics failed
+- `ReadFailed` (`2`): all enabled metrics failed
 
 The database enforces the expected row shape:
 
@@ -94,7 +83,7 @@ The persisted metrics API is exposed by `SystemController` under:
 
 ### Get current metrics
 
-Returns the latest successful persisted metrics sample.
+Returns the latest persisted sample whose status is `Success` or `PartialSuccess`.
 
 ```http
 GET /api/system/metrics/current
@@ -216,9 +205,9 @@ The check returns unhealthy when any of these are true:
 
 - the background sampler is not currently running
 - no successful collection has completed yet
-- the most recent successful collection is older than 30 seconds
+- the most recent successful collection is older than the staleness threshold: three sampling intervals, but at least 30 seconds
 
-The 30-second staleness window is intentionally larger than the 5-second sampling interval so the app can tolerate a few delayed cycles before the service is considered unready.
+The threshold scales with the configured interval, so the app tolerates a few delayed cycles before the collector is considered unready. A fixed window would mark any interval above 30 s as permanently unhealthy.
 
 Health data for this check includes:
 
@@ -226,7 +215,7 @@ Health data for this check includes:
 - `lastSuccessfulCollectionUtc`: timestamp of the latest successful collection, or `never`
 - `lastAttemptUtc`: timestamp of the latest attempt, or `never`
 - `lastError`: latest recorded error message, or an empty string
-- `maxSnapshotAgeSeconds`: readiness staleness threshold, currently `30`
+- `maxSnapshotAgeSeconds`: readiness staleness threshold in seconds (`max(30, 3 × IntervalSeconds)`)
 - `snapshotAgeSeconds`: included only after the first successful collection
 
 Example scenarios:
@@ -360,22 +349,21 @@ For background persistence, `LinuxSystemMetricsCollector` converts those errors 
 - CPU usage is an average over roughly 300 ms, not an instantaneous reading.
 - Memory values depend on what the Linux kernel reports at the time of the read.
 - The reported percentages are rounded for presentation, so they are slightly less precise than the raw calculated values.
-- The background sampling interval is currently hard-coded to 5 seconds.
+- The background sampling interval is configured by `Monitoring:Collection:IntervalSeconds`.
+- Persisted timestamps are UTC; SQLite returns them without a kind, so they are explicitly marked as UTC when read (EF value converter) and when bucketing.
 - Persisted samples contain CPU and RAM percentages only. Full memory byte counters are available from the live `SystemStatus` read but are not stored in `SystemMetric`.
 
 ## Related code
 
 - `apps/backend/src/NodePilot.Api/Controllers/SystemController.cs`
-- `apps/backend/src/NodePilot.Application/SystemStatus/Services/SystemMetricsReader.cs`
-- `apps/backend/src/NodePilot.Application/SystemStatus/Services/SystemMetricsCollector.cs`
-- `apps/backend/src/NodePilot.Application/SystemStatus/Services/SystemMetricsProvider.cs`
-- `apps/backend/src/NodePilot.Application/SystemStatus/SystemStatus.cs`
-- `apps/backend/src/NodePilot.Application/SystemStatus/SystemMetric.cs`
-- `apps/backend/src/NodePilot.Application/SystemStatus/Errors/SystemStatusErrors.cs`
-- `apps/backend/src/NodePilot.Application/Interfaces/SystemStatus/ISystemMetricsReader.cs`
-- `apps/backend/src/NodePilot.Application/Interfaces/SystemStatus/ISystemMetricsCollector.cs`
-- `apps/backend/src/NodePilot.Application/Interfaces/SystemStatus/ISystemMetricsProvider.cs`
-- `apps/backend/src/NodePilot.Application/Interfaces/SystemStatus/ISystemMetricsRepository.cs`
+- `apps/backend/src/NodePilot.Application/Monitoring/Services/SystemMetricsReader.cs`
+- `apps/backend/src/NodePilot.Application/Monitoring/Services/SystemMetricsCollector.cs`
+- `apps/backend/src/NodePilot.Application/Monitoring/Services/SystemMetricsProvider.cs`
+- `apps/backend/src/NodePilot.Application/Monitoring/Services/SystemOverviewProvider.cs`
+- `apps/backend/src/NodePilot.Application/Monitoring/Services/LinuxSystemParsers.cs`
+- `apps/backend/src/NodePilot.Application/Monitoring/Models/`
+- `apps/backend/src/NodePilot.Application/Interfaces/Monitoring/`
 - `apps/backend/src/NodePilot.Infrastructure/Background/MetricsSamplingBackgroundService.cs`
+- `apps/backend/src/NodePilot.Infrastructure/Background/MetricsCleanupBackgroundService.cs`
 - `apps/backend/src/NodePilot.Infrastructure/Persistence/Repositories/SystemMetricsRepository.cs`
 - `apps/backend/src/NodePilot.Infrastructure/Persistence/Configurations/SystemMetricsConfiguration.cs`
