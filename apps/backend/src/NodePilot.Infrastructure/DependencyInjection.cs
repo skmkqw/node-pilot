@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using NodePilot.Application.Files.Settings;
 using NodePilot.Application.Interfaces.Common;
 using NodePilot.Application.Interfaces.Monitoring;
 using NodePilot.Application.Monitoring.Models;
@@ -41,6 +42,17 @@ public static class DependencyInjection
             .ValidateFluently()
             .ValidateOnStart();
         services.AddSingleton<IMonitoringSettingsProvider, MonitoringSettingsProvider>();
+
+        services
+            .AddOptions<FileManagerSettings>()
+            .Bind(configuration.GetSection(FileManagerSettings.SectionName))
+            .Validate(
+                settings => !string.IsNullOrWhiteSpace(settings.RootPath),
+                "FileManager:RootPath must be configured.")
+            .Validate(
+                settings => settings.MaxUploadMegabytes is >= 1 and <= 100 * 1024,
+                "FileManager:MaxUploadMegabytes must be between 1 and 102400.")
+            .ValidateOnStart();
 
         return services;
     }
