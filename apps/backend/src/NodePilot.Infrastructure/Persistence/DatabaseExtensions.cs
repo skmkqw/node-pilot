@@ -47,16 +47,27 @@ public static class DatabaseExtensions
         }
     }
 
+    public const string DefaultConnectionString = "Data Source=data/nodepilot.db";
+
+    /// <summary>
+    /// Uses <c>NODE_PILOT_DB_CONNECTION_STRING</c> when set, otherwise a SQLite file in
+    /// <c>data/</c> next to the working directory, so no configuration is required.
+    /// </summary>
     public static string ResolveConnectionString()
     {
         LoadDotEnv();
 
         string? connectionString = Environment.GetEnvironmentVariable("NODE_PILOT_DB_CONNECTION_STRING")?.Trim();
 
-        if (string.IsNullOrEmpty(connectionString))
-            throw new InvalidOperationException("Environment variable 'NODE_PILOT_DB_CONNECTION_STRING' is missing.");
+        return string.IsNullOrEmpty(connectionString) ? DefaultConnectionString : connectionString;
+    }
 
-        return connectionString;
+    /// <summary>Directory that holds the SQLite database; other persistent data lives next to it.</summary>
+    public static string ResolveDataDirectory(string connectionString)
+    {
+        string dataSource = new SqliteConnectionStringBuilder(connectionString).DataSource;
+
+        return Path.GetDirectoryName(Path.GetFullPath(dataSource)) ?? Directory.GetCurrentDirectory();
     }
 
     /// <summary>
