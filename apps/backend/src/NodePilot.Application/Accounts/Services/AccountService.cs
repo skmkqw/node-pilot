@@ -50,6 +50,12 @@ public sealed partial class AccountService : IAccountService
         string? password,
         CancellationToken ct = default)
     {
+        // Once an administrator exists, setup is closed regardless of what was sent.
+        if (await _accounts.AnyAsync(ct))
+        {
+            return AccountErrors.SetupAlreadyCompleted;
+        }
+
         var validation = Validate(username, password);
 
         if (validation.IsError)
