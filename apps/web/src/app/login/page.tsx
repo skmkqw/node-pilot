@@ -1,12 +1,14 @@
 "use client";
 
 import { AnimatePresence, motion, useAnimationControls } from "motion/react";
-import { Activity, ArrowRight, Eye, EyeOff, FolderOpen, Lock, ShieldCheck, TriangleAlert, User } from "lucide-react";
+import { Activity, ArrowRight, FolderOpen, Lock, ShieldCheck, TriangleAlert, User } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
+import { OfflineScreen } from "@/components/shell/offline-screen";
 import { Splash } from "@/components/shell/splash";
 import { Button } from "@/components/ui/button";
+import { Field, PasswordField, inputClassName } from "@/components/ui/field";
 import { Logo } from "@/components/ui/logo";
 import { Switch } from "@/components/ui/switch";
 
@@ -30,7 +32,7 @@ function safeNextPath(value: string | null) {
 }
 
 function LoginScreen() {
-	const { status, login } = useAuth();
+	const { status, login, retry } = useAuth();
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const next = safeNextPath(searchParams.get("next"));
@@ -38,7 +40,6 @@ function LoginScreen() {
 	const [username, setUsername] = useState("admin");
 	const [password, setPassword] = useState("");
 	const [rememberMe, setRememberMe] = useState(true);
-	const [showPassword, setShowPassword] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const shake = useAnimationControls();
@@ -46,6 +47,8 @@ function LoginScreen() {
 	useEffect(() => {
 		if (status === "authenticated") {
 			router.replace(next);
+		} else if (status === "setup") {
+			router.replace("/setup");
 		}
 	}, [status, router, next]);
 
@@ -64,7 +67,11 @@ function LoginScreen() {
 		}
 	};
 
-	if (status === "loading") {
+	if (status === "offline") {
+		return <OfflineScreen onRetry={retry} />;
+	}
+
+	if (status !== "anonymous") {
 		return <Splash />;
 	}
 
@@ -162,36 +169,21 @@ function LoginScreen() {
 								onChange={(event) => setUsername(event.target.value)}
 								autoComplete="username"
 								required
-								className="h-12 w-full bg-transparent pr-4 text-sm text-white outline-none placeholder:text-slate-500"
+								className={inputClassName}
 								placeholder="admin"
 							/>
 						</Field>
 
-						<Field
+						<PasswordField
 							icon={<Lock className="size-4" />}
 							label="Password"
-							trailing={
-								<button
-									type="button"
-									onClick={() => setShowPassword((value) => !value)}
-									className="grid size-9 place-items-center rounded-lg text-slate-400 transition hover:text-white"
-									aria-label={showPassword ? "Hide password" : "Show password"}
-								>
-									{showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-								</button>
-							}
-						>
-							<input
-								type={showPassword ? "text" : "password"}
-								value={password}
-								onChange={(event) => setPassword(event.target.value)}
-								autoComplete="current-password"
-								required
-								autoFocus
-								className="h-12 w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
-								placeholder="••••••••"
-							/>
-						</Field>
+							value={password}
+							onChange={(event) => setPassword(event.target.value)}
+							autoComplete="current-password"
+							required
+							autoFocus
+							placeholder="••••••••"
+						/>
 
 						<label className="flex cursor-pointer items-center justify-between rounded-2xl px-1 py-1 text-sm text-slate-300">
 							Keep me signed in
@@ -223,33 +215,7 @@ function LoginScreen() {
 					</div>
 				</motion.form>
 
-				<p className="mt-6 text-center text-xs text-slate-500">
-					Credentials are configured on the server (<code className="text-slate-400">Auth__Password</code>).
-				</p>
 			</motion.div>
 		</div>
-	);
-}
-
-function Field({
-	icon,
-	label,
-	trailing,
-	children,
-}: {
-	icon: React.ReactNode;
-	label: string;
-	trailing?: React.ReactNode;
-	children: React.ReactNode;
-}) {
-	return (
-		<label className="block">
-			<span className="mb-1.5 block text-xs font-medium text-slate-400">{label}</span>
-			<span className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] pl-4 pr-1.5 text-slate-500 transition focus-within:border-cyan-300/50 focus-within:bg-white/[0.06] focus-within:text-cyan-300 focus-within:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]">
-				{icon}
-				{children}
-				{trailing}
-			</span>
-		</label>
 	);
 }
