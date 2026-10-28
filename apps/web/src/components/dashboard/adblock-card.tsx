@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { Ban, RefreshCw, ShieldCheck, ShieldOff, ShieldQuestion, Timer, Users } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import { Button } from "@/components/ui/button";
@@ -264,12 +265,13 @@ function NotConfigured() {
 				<Ban className="size-4 text-slate-400" /> Connect your Pi-hole
 			</div>
 			<p className="mt-1.5 text-xs leading-5 text-muted">
-				Add the address and app password of your Pi-hole (v6) to the server&apos;s <code className="text-slate-300">.env</code>{" "}
-				file and restart NodePilot:
+				Add your Pi-hole address and app password to control network-wide ad blocking from here.
 			</p>
-			<pre className="mt-3 overflow-x-auto rounded-xl border border-white/5 bg-black/40 p-3 font-mono text-[0.72rem] leading-5 text-cyan-200/90">
-				{"PiHole__BaseUrl=http://192.168.1.2\nPiHole__Password=your-app-password"}
-			</pre>
+			<Link href="/settings#pihole" className="mt-3 inline-block">
+				<Button size="sm" variant="primary">
+					Connect Pi-hole
+				</Button>
+			</Link>
 		</motion.div>
 	);
 }
