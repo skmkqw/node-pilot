@@ -1,53 +1,71 @@
 using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.Options;
 using NodePilot.Api.Auth;
+using NodePilot.Application.Accounts.Models;
+using NodePilot.Application.Interfaces.Accounts;
 
 namespace NodePilot.Api.Controllers;
 
 [Route("api/auth")]
 public class AuthController : BaseController
 {
-    private readonly IOptionsMonitor<AuthSettings> _authSettings;
+    private readonly IAccountService _accounts;
 
-    public AuthController(IOptionsMonitor<AuthSettings> authSettings)
+    public AuthController(IAccountService accounts)
     {
-        _authSettings = authSettings;
+        _accounts = accounts;
+    }
+
+    /// <summary>
+    /// Tells the web app which screen to show: first-start setup, login, or the panel.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpGet("status")]
+    public async Task<IActionResult> GetStatusAsync(CancellationToken ct)
+    {
+        bool setupRequired = await _accounts.IsSetupRequiredAsync(ct);
+        bool authenticated = !setupRequired && User.Identity?.IsAuthenticated == true;
+
+        return Ok(new AuthStatusResponse(setupRequired, authenticated, authenticated ? User.Identity!.Name : null));
+    }
+
+    /// <summary>Creates the administrator account. Only possible while no account exists.</summary>
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingExtensions.LoginPolicy)]
+    [HttpPost("setup")]
+    public async Task<IActionResult> SetupAsync([FromBody] CredentialsRequest request, CancellationToken ct)
+    {
+        var result = await _accounts.CreateInitialAdminAsync(request.Username, request.Password, ct);
+
+        if (result.IsError)
+        {
+            return Problem(result.Errors);
+        }
+
+        await SignInAsync(result.Value, isPersistent: true);
+
+        return StatusCode(StatusCodes.Status201Created, new CurrentUserResponse(result.Value.Username));
     }
 
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitingExtensions.LoginPolicy)]
     [HttpPost("login")]
-    public async Task<IActionResult> LoginAsync([FromBody] LoginRequest request)
+    public async Task<IActionResult> LoginAsync([FromBody] LoginRequest request, CancellationToken ct)
     {
-        var settings = _authSettings.CurrentValue;
+        var result = await _accounts.ValidateCredentialsAsync(request.Username, request.Password, ct);
 
-        bool usernameMatches = FixedTimeEquals(request.Username, settings.Username);
-        bool passwordMatches = FixedTimeEquals(request.Password, settings.Password);
-
-        if (!usernameMatches || !passwordMatches)
+        if (result.IsError)
         {
-            return Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                title: "Invalid username or password.");
+            return Problem(result.Errors);
         }
 
-        var identity = new ClaimsIdentity(
-            [new Claim(ClaimTypes.Name, settings.Username)],
-            CookieAuthenticationDefaults.AuthenticationScheme);
+        await SignInAsync(result.Value, request.RememberMe);
 
-        await HttpContext.SignInAsync(
-            CookieAuthenticationDefaults.AuthenticationScheme,
-            new ClaimsPrincipal(identity),
-            new AuthenticationProperties { IsPersistent = request.RememberMe });
-
-        return Ok(new CurrentUserResponse(settings.Username));
+        return Ok(new CurrentUserResponse(result.Value.Username));
     }
 
     [AllowAnonymous]
@@ -65,17 +83,41 @@ public class AuthController : BaseController
         return Ok(new CurrentUserResponse(User.Identity?.Name ?? string.Empty));
     }
 
-    // Hashing both sides first gives equal-length inputs, so the comparison time
-    // does not leak how many leading characters were correct.
-    private static bool FixedTimeEquals(string? provided, string expected)
+    [HttpPost("password")]
+    public async Task<IActionResult> ChangePasswordAsync([FromBody] ChangePasswordRequest request, CancellationToken ct)
     {
-        byte[] providedHash = SHA256.HashData(Encoding.UTF8.GetBytes(provided ?? string.Empty));
-        byte[] expectedHash = SHA256.HashData(Encoding.UTF8.GetBytes(expected));
+        if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int accountId))
+        {
+            return Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Please sign in again.");
+        }
 
-        return CryptographicOperations.FixedTimeEquals(providedHash, expectedHash);
+        var result = await _accounts.ChangePasswordAsync(accountId, request.CurrentPassword, request.NewPassword, ct);
+
+        return result.Match(_ => NoContent(), Problem);
+    }
+
+    private Task SignInAsync(UserAccount account, bool isPersistent)
+    {
+        var identity = new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.NameIdentifier, account.Id.ToString()),
+                new Claim(ClaimTypes.Name, account.Username),
+            ],
+            CookieAuthenticationDefaults.AuthenticationScheme);
+
+        return HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            new ClaimsPrincipal(identity),
+            new AuthenticationProperties { IsPersistent = isPersistent });
     }
 }
 
+public sealed record CredentialsRequest(string? Username, string? Password);
+
 public sealed record LoginRequest(string? Username, string? Password, bool RememberMe = false);
 
+public sealed record ChangePasswordRequest(string? CurrentPassword, string? NewPassword);
+
 public sealed record CurrentUserResponse(string Username);
+
+public sealed record AuthStatusResponse(bool SetupRequired, bool Authenticated, string? Username);
