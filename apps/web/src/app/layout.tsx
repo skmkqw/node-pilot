@@ -1,17 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { AuroraBackground } from "@/components/ui/aurora-background";
+import { Space_Grotesk, Space_Mono } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
 
-const geistSans = Geist({
-	variable: "--font-geist-sans",
+const spaceGrotesk = Space_Grotesk({
+	variable: "--font-grotesk",
 	subsets: ["latin", "latin-ext"],
+	weight: ["400", "500", "700"],
 });
 
-const geistMono = Geist_Mono({
-	variable: "--font-geist-mono",
-	subsets: ["latin"],
+const spaceMono = Space_Mono({
+	variable: "--font-space-mono",
+	subsets: ["latin", "latin-ext"],
+	weight: ["400", "700"],
 });
 
 export const metadata: Metadata = {
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-	themeColor: "#04060c",
+	themeColor: "#264653",
 	width: "device-width",
 	initialScale: 1,
 	viewportFit: "cover",
@@ -35,12 +36,8 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<html
-			lang="en"
-			className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-		>
+		<html lang="en" className={`${spaceGrotesk.variable} ${spaceMono.variable} h-full antialiased`}>
 			<body className="min-h-full">
-				<AuroraBackground />
 				<Providers>{children}</Providers>
 			</body>
 		</html>
