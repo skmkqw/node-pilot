@@ -2,9 +2,11 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
+using ErrorOr;
+using NodePilot.Application.AdBlocking.Models;
 using NodePilot.Application.AdBlocking.Settings;
 using NodePilot.Application.Common;
+using NodePilot.Application.Interfaces.AdBlocking;
 using NodePilot.Infrastructure.AdBlocking;
 
 namespace NodePilot.Api.Tests.Unit;
@@ -108,18 +110,22 @@ public class PiHoleClientTests
 
         return new PiHoleClient(
             new HttpClient(handler),
-            new StaticOptionsMonitor<PiHoleSettings>(settings),
+            new StaticSettingsStore(settings),
             new PiHoleSessionStore(),
             NullLogger<PiHoleClient>.Instance);
     }
 
-    private sealed class StaticOptionsMonitor<T>(T value) : IOptionsMonitor<T>
+    private sealed class StaticSettingsStore(PiHoleSettings settings) : IPiHoleSettingsStore
     {
-        public T CurrentValue => value;
+        public Task<PiHoleSettings> GetEffectiveAsync(CancellationToken ct = default) => Task.FromResult(settings);
 
-        public T Get(string? name) => value;
+        public Task<PiHoleConnectionInfo> GetInfoAsync(CancellationToken ct = default) =>
+            Task.FromResult(new PiHoleConnectionInfo(settings.BaseUrl, settings.Password.Length > 0, PiHoleSettingsSource.App));
 
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
+        public Task<ErrorOr<PiHoleConnectionInfo>> SaveAsync(string? baseUrl, string? password, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task ClearAsync(CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     /// <summary>In-memory stand-in for the Pi-hole v6 REST API.</summary>

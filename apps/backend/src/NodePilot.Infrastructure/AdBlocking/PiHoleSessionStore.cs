@@ -1,8 +1,13 @@
+using System.Security.Cryptography;
+using System.Text;
+using NodePilot.Application.AdBlocking.Settings;
+
 namespace NodePilot.Infrastructure.AdBlocking;
 
 /// <summary>
 /// Caches the Pi-hole session id across requests. Pi-hole limits the number of concurrent
-/// sessions, so logging in on every call would quickly exhaust them.
+/// sessions, so logging in on every call would quickly exhaust them. The session is tied to
+/// the URL and password it was created with and is replaced as soon as either changes.
 /// </summary>
 public sealed class PiHoleSessionStore
 {
@@ -10,13 +15,16 @@ public sealed class PiHoleSessionStore
 
     private string? _sid;
 
-    private bool _authenticated;
+    private string? _fingerprint;
 
     public async Task<string?> GetOrCreateAsync(
+        PiHoleSettings settings,
         Func<CancellationToken, Task<string?>> authenticate,
         CancellationToken ct)
     {
-        if (_authenticated)
+        string fingerprint = Fingerprint(settings);
+
+        if (_fingerprint == fingerprint)
         {
             return _sid;
         }
@@ -25,10 +33,10 @@ public sealed class PiHoleSessionStore
 
         try
         {
-            if (!_authenticated)
+            if (_fingerprint != fingerprint)
             {
                 _sid = await authenticate(ct);
-                _authenticated = true;
+                _fingerprint = fingerprint;
             }
 
             return _sid;
@@ -41,7 +49,13 @@ public sealed class PiHoleSessionStore
 
     public void Invalidate()
     {
-        _authenticated = false;
+        _fingerprint = null;
         _sid = null;
+    }
+
+    private static string Fingerprint(PiHoleSettings settings)
+    {
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes($"{settings.BaseUrl}\n{settings.Password}"));
+        return Convert.ToHexString(hash);
     }
 }
