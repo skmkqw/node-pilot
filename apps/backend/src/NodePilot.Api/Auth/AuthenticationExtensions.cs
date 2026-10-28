@@ -16,12 +16,6 @@ public static class AuthenticationExtensions
             .AddOptions<AuthSettings>()
             .Bind(configuration.GetSection(AuthSettings.SectionName))
             .Validate(
-                settings => !string.IsNullOrWhiteSpace(settings.Username),
-                "Auth:Username must be configured.")
-            .Validate(
-                settings => settings.Password.Length >= AuthSettings.MinimumPasswordLength,
-                $"Auth:Password must be at least {AuthSettings.MinimumPasswordLength} characters. Set Auth__Password in the .env file.")
-            .Validate(
                 settings => settings.SessionLifetimeHours is >= 1 and <= 24 * 30,
                 "Auth:SessionLifetimeHours must be between 1 and 720.")
             .ValidateOnStart();
