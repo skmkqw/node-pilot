@@ -1,16 +1,32 @@
 import { ApiError, apiUrl, request, toApiError } from "./client";
 import type {
 	AdBlockerStatus,
+	AuthStatus,
 	CurrentUser,
 	DirectoryListing,
 	FileEntry,
 	IntervalMetricsSummary,
+	PiHoleConnectionInfo,
 	SystemMetric,
 	SystemOverview,
 } from "./types";
 
 export const authApi = {
+	status: (signal?: AbortSignal) => request<AuthStatus>("/api/auth/status", { signal }),
+
 	me: (signal?: AbortSignal) => request<CurrentUser>("/api/auth/me", { signal }),
+
+	setup: (username: string, password: string) =>
+		request<CurrentUser>("/api/auth/setup", {
+			method: "POST",
+			body: { username, password },
+		}),
+
+	changePassword: (currentPassword: string, newPassword: string) =>
+		request<void>("/api/auth/password", {
+			method: "POST",
+			body: { currentPassword, newPassword },
+		}),
 
 	login: (username: string, password: string, rememberMe: boolean) =>
 		request<CurrentUser>("/api/auth/login", {
@@ -108,5 +124,25 @@ export const adBlockApi = {
 		request<AdBlockerStatus>("/api/adblock/blocking", {
 			method: "POST",
 			body: { enabled, durationSeconds: durationSeconds ?? null },
+		}),
+};
+
+export const settingsApi = {
+	piHole: (signal?: AbortSignal) => request<PiHoleConnectionInfo>("/api/settings/pihole", { signal }),
+
+	/** `password: null` keeps the saved password; an empty string removes it. */
+	savePiHole: (baseUrl: string, password: string | null) =>
+		request<PiHoleConnectionInfo>("/api/settings/pihole", {
+			method: "PUT",
+			body: { baseUrl, password },
+		}),
+
+	disconnectPiHole: () => request<void>("/api/settings/pihole", { method: "DELETE" }),
+
+	/** Checks the address/password without saving. `password: null` uses the saved one. */
+	testPiHole: (baseUrl: string, password: string | null) =>
+		request<AdBlockerStatus>("/api/settings/pihole/test", {
+			method: "POST",
+			body: { baseUrl, password },
 		}),
 };

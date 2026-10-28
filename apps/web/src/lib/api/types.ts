@@ -113,3 +113,17 @@ export type AdBlockerStatus = {
 export type CurrentUser = {
 	username: string;
 };
+
+export type AuthStatus = {
+	setupRequired: boolean;
+	authenticated: boolean;
+	username: string | null;
+};
+
+export type PiHoleSettingsSource = "None" | "App" | "Environment";
+
+export type PiHoleConnectionInfo = {
+	baseUrl: string | null;
+	hasPassword: boolean;
+	source: PiHoleSettingsSource;
+};
