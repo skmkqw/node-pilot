@@ -18,6 +18,9 @@ public static class AuthenticationExtensions
             .Validate(
                 settings => settings.SessionLifetimeHours is >= 1 and <= 24 * 30,
                 "Auth:SessionLifetimeHours must be between 1 and 720.")
+            .Validate(
+                settings => settings.LoginAttemptsPerMinute is >= 1 and <= 10_000,
+                "Auth:LoginAttemptsPerMinute must be between 1 and 10000.")
             .ValidateOnStart();
 
         services

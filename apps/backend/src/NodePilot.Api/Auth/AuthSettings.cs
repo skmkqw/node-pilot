@@ -9,4 +9,6 @@ public sealed class AuthSettings
     public const string SectionName = "Auth";
 
     public int SessionLifetimeHours { get; init; } = 168;
+
+    public int LoginAttemptsPerMinute { get; init; } = 5;
 }
