@@ -8,7 +8,8 @@ NodePilot is a lightweight, unified control panel for a home server. One web app
 | **Files & media** | Browse a sandboxed folder on the server, upload (drag & drop), create folders, download and delete files. |
 | **Video player** | Stream MP4, WebM, MOV and OGV videos (plus audio and images) right in the browser, with seeking via HTTP range requests. |
 | **Ad blocking** | Pi-hole (v6) integration: see today's statistics and switch network-wide blocking on/off or pause it for 5 min – 1 h. |
-| **Sign-in** | A single administrator account protected by an HTTP-only session cookie and login rate limiting. |
+| **Setup & settings** | First-start wizard creates the administrator account; Settings lets you change the password and connect/test Pi-hole. No `.env` editing needed. |
+| **Sign-in** | HTTP-only session cookie, salted PBKDF2 password hash, login rate limiting. |
 
 ## Monorepo structure
 
@@ -42,38 +43,33 @@ nodepilot/
 
 ## Configuration
 
-Copy the example file and **set a password**:
+**No configuration is needed.** On the first start, NodePilot opens a setup screen:
 
-```bash
-cp .env.example .env
-```
+1. Create the administrator account (the password is stored as a salted PBKDF2 hash).
+2. Optionally connect Pi-hole (address and app password; the password is stored encrypted).
+
+Both can be changed later in **Settings**.
+
+Optional environment variables (see `.env.example`):
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `Auth__Username` | Administrator login | `admin` |
-| `Auth__Password` | Administrator password (min. 8 characters) | — (required) |
-| `NODE_PILOT_DB_CONNECTION_STRING` | SQLite connection string for local runs | `Data Source=data/nodepilot.db` |
-| `PiHole__BaseUrl` | Pi-hole v6 address, e.g. `http://192.168.1.2`. Empty disables the integration. | empty |
-| `PiHole__Password` | Pi-hole app password | empty |
 | `NODEPILOT_FILES_DIR` | Host folder shown in the file manager (Docker Compose) | `./data/files` |
-| `NEXT_PUBLIC_API_URL` | Backend URL used by the browser. Empty = same host, port 5000. | empty |
 | `BACKEND_PORT` / `WEB_PORT` | Published ports | `5000` / `3000` |
+| `NODE_PILOT_DB_CONNECTION_STRING` | Custom SQLite location | `Data Source=data/nodepilot.db` |
+| `NEXT_PUBLIC_API_URL` | Backend URL for the browser, if not `<host>:5000` | empty |
+| `PiHole__BaseUrl` / `PiHole__Password` | Pre-configure Pi-hole for automated deployments (settings saved in the app take precedence) | empty |
 
-Further settings live in `apps/backend/src/NodePilot.Api/appsettings.json`:
+Advanced settings live in `apps/backend/src/NodePilot.Api/appsettings.json`: monitoring intervals and retention, `FileManager:RootPath` / `MaxUploadMegabytes`, CORS, and `Auth:SessionLifetimeHours` / `LoginAttemptsPerMinute`.
 
-- `Monitoring`: sampling interval, retention, which metrics to collect
-- `FileManager`: `RootPath` (the only directory the file manager can access) and `MaxUploadMegabytes`
-- `Cors`: allowed origins; `AllowPrivateNetworkOrigins` lets devices in the LAN use the panel
-- `Auth:SessionLifetimeHours`
-
-Every section is validated at startup, and the app refuses to start with a clear message if something is missing.
+The `data/` folder next to the backend holds the database and the encryption keys (`data/keys`). Back up both together.
 
 ## Running
 
 ### Option 1: Docker Compose
 
 ```bash
-cp .env.example .env    # then edit Auth__Password
+cp .env.example .env    # optional
 docker compose up --build
 ```
 
@@ -95,7 +91,7 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3000> and sign in with the credentials from `.env`.
+Open <http://localhost:3000>. The first visit shows the setup screen.
 
 ## Tests
 
