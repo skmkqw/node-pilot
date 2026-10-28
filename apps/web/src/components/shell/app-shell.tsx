@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { FolderOpen, LayoutDashboard, LogOut } from "lucide-react";
+import { FolderOpen, LayoutDashboard, LogOut, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/cn";
 const NAV_ITEMS = [
 	{ href: "/", label: "Dashboard", icon: LayoutDashboard },
 	{ href: "/files", label: "Files & Media", icon: FolderOpen },
+	{ href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 function isActive(pathname: string, href: string) {
