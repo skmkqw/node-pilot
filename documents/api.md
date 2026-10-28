@@ -2,7 +2,7 @@
 
 Base URL: `http://<server>:5000`. All responses are JSON and enums are serialized as strings. Errors use [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) (`title`, `status`, and `errors` for validation failures).
 
-Every endpoint except `/health` and `POST /api/auth/login` requires the session cookie `nodepilot.session`. Without it, the API answers **401**.
+Every endpoint except `/health`, `GET /api/auth/status`, `POST /api/auth/setup` and `POST /api/auth/login` requires the session cookie `nodepilot.session`. Without it, the API answers **401**.
 
 | Status | Meaning |
 |---|---|
@@ -18,11 +18,28 @@ Every endpoint except `/health` and `POST /api/auth/login` requires the session 
 
 | Method | Path | Body | Result |
 |---|---|---|---|
+| GET | `/api/auth/status` | – | `{ "setupRequired", "authenticated", "username" }` (public) |
+| POST | `/api/auth/setup` | `{ "username", "password" }` | `201` + cookie. Only while no account exists, otherwise `409`. |
 | POST | `/api/auth/login` | `{ "username", "password", "rememberMe" }` | `200 { "username" }` + cookie |
 | POST | `/api/auth/logout` | – | `204` |
 | GET | `/api/auth/me` | – | `200 { "username" }` |
+| POST | `/api/auth/password` | `{ "currentPassword", "newPassword" }` | `204` |
 
-`rememberMe: true` makes the cookie persistent (lifetime `Auth:SessionLifetimeHours`, sliding).
+- Usernames: 3–32 characters (`A–Z a–z 0–9 . _ -`), case-insensitive. Passwords: 8–128 characters.
+- Passwords are stored as PBKDF2 hashes (ASP.NET Core Identity format v3).
+- Setup and login share the rate limit (`Auth:LoginAttemptsPerMinute`, default 5 per IP).
+- `rememberMe: true` makes the cookie persistent (lifetime `Auth:SessionLifetimeHours`, sliding).
+
+## Settings
+
+| Method | Path | Body | Result |
+|---|---|---|---|
+| GET | `/api/settings/pihole` | – | `{ "baseUrl", "hasPassword", "source": "None" \| "App" \| "Environment" }` (the password is never returned) |
+| PUT | `/api/settings/pihole` | `{ "baseUrl", "password" }` | Saves. `password: null` keeps the saved one, `""` removes it. |
+| DELETE | `/api/settings/pihole` | – | `204`, disconnects Pi-hole |
+| POST | `/api/settings/pihole/test` | `{ "baseUrl", "password" }` | Ad blocker status for the given values, without saving (`password: null` = use the saved one) |
+
+The Pi-hole password is encrypted with ASP.NET Core Data Protection; the key ring is stored in `data/keys` next to the database.
 
 ## System monitoring
 
