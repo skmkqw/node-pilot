@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using NodePilot.Application.Accounts.Services;
 using NodePilot.Application.Files.Services;
+using NodePilot.Application.Interfaces.Accounts;
 using NodePilot.Application.Interfaces.Files;
 using NodePilot.Application.Interfaces.Monitoring;
 
@@ -17,6 +19,7 @@ public static class DependencyInjection
         services.AddScoped<IMetricsRetentionService, MetricsRetentionService>();
         services.AddSingleton<ISystemOverviewProvider, SystemOverviewProvider>();
         services.AddSingleton<IFileManagerService, FileManagerService>();
+        services.AddScoped<IAccountService, AccountService>();
         return services;
     }
 }
