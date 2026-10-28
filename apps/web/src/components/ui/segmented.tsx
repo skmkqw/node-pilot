@@ -12,17 +12,13 @@ type SegmentedProps<T extends string> = {
 	label: string;
 };
 
-/** Pill-style tab switcher whose active background glides between options. */
+/** Row of selector keys; the active one is "pressed in" (ink background). */
 export function Segmented<T extends string>({ value, onChange, options, size = "md", label }: SegmentedProps<T>) {
 	const layoutId = useId();
 
 	return (
-		<div
-			role="tablist"
-			aria-label={label}
-			className="inline-flex rounded-xl border border-white/8 bg-black/20 p-0.5"
-		>
-			{options.map((option) => {
+		<div role="tablist" aria-label={label} className="inline-flex border-2 border-ink bg-surface">
+			{options.map((option, index) => {
 				const active = option.value === value;
 
 				return (
@@ -33,17 +29,14 @@ export function Segmented<T extends string>({ value, onChange, options, size = "
 						aria-selected={active}
 						onClick={() => onChange(option.value)}
 						className={cn(
-							"relative rounded-[0.6rem] font-medium transition-colors",
-							size === "sm" ? "px-2.5 py-1 text-[0.7rem]" : "px-3 py-1.5 text-xs",
-							active ? "text-white" : "text-slate-400 hover:text-slate-200",
+							"relative font-mono font-bold uppercase transition-colors",
+							index > 0 && "border-l-2 border-ink",
+							size === "sm" ? "min-h-8 px-2.5 text-[0.7rem]" : "min-h-9 px-3 text-xs",
+							active ? "text-accent" : "text-ink hover:bg-accent",
 						)}
 					>
 						{active ? (
-							<motion.span
-								layoutId={layoutId}
-								transition={{ type: "spring", stiffness: 500, damping: 36 }}
-								className="absolute inset-0 rounded-[0.6rem] border border-white/10 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-							/>
+							<motion.span layoutId={layoutId} transition={{ type: "spring", stiffness: 700, damping: 40 }} className="absolute inset-0 bg-ink" />
 						) : null}
 						<span className="relative">{option.label}</span>
 					</button>

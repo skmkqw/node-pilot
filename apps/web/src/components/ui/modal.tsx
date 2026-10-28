@@ -41,27 +41,24 @@ export function Modal({ open, onClose, children, className, labelledBy }: ModalP
 						initial={{ opacity: 0 }}
 						animate={{ opacity: 1 }}
 						exit={{ opacity: 0 }}
+						transition={{ duration: 0.15 }}
 					>
-						<motion.div
-							className="absolute inset-0 bg-[#02040a]/75 backdrop-blur-md"
-							onClick={onClose}
-							aria-hidden
-						/>
+						<div className="absolute inset-0 bg-ink/70" onClick={onClose} aria-hidden />
 						<motion.div
 							role="dialog"
 							aria-modal="true"
 							aria-labelledby={labelledBy}
-							initial={{ opacity: 0, scale: 0.94, y: 24, filter: "blur(8px)" }}
-							animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
-							exit={{ opacity: 0, scale: 0.96, y: 12, filter: "blur(6px)" }}
-							transition={{ type: "spring", stiffness: 360, damping: 30 }}
-							className={cn("glass relative w-full rounded-3xl", className)}
+							initial={{ opacity: 0, y: 28 }}
+							animate={{ opacity: 1, y: 0 }}
+							exit={{ opacity: 0, y: 16 }}
+							transition={{ type: "spring", stiffness: 520, damping: 34 }}
+							className={cn("panel relative w-full shadow-[8px_8px_0_var(--accent)]", className)}
 						>
 							<button
 								type="button"
 								onClick={onClose}
 								aria-label="Close"
-								className="absolute right-4 top-4 z-10 grid size-9 place-items-center rounded-full border border-white/10 bg-black/40 text-slate-300 backdrop-blur transition hover:rotate-90 hover:text-white"
+								className="absolute right-3 top-3 z-10 grid size-9 place-items-center border-2 border-ink bg-surface text-ink transition hover:bg-accent"
 							>
 								<X className="size-4" />
 							</button>
