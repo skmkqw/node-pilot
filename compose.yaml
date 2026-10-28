@@ -10,12 +10,8 @@ services:
       ASPNETCORE_URLS: http://+:8080
       NODE_PILOT_DB_CONNECTION_STRING: Data Source=/app/data/nodepilot.db
       FileManager__RootPath: /files
-      Auth__Username: ${Auth__Username:-admin}
-      Auth__Password: ${Auth__Password:?Set Auth__Password in .env (at least 8 characters)}
-      PiHole__BaseUrl: ${PiHole__BaseUrl:-}
-      PiHole__Password: ${PiHole__Password:-}
     volumes:
-      # SQLite database with the metrics history survives container rebuilds.
+      # Database (account, settings, metrics) and encryption keys survive container rebuilds.
       - nodepilot-data:/app/data
       # Directory exposed in the file manager (videos, documents, ...).
       - ${NODEPILOT_FILES_DIR:-./data/files}:/files
