@@ -8,6 +8,7 @@ export type SystemMetric = {
 	cpuUsagePercent: number | null;
 	ramEnabled: boolean;
 	ramUsagePercent: number | null;
+	cpuTemperatureCelsius: number | null;
 	status: MetricCollectionStatus;
 	totalReads: number;
 	successfulReads: number;
@@ -25,6 +26,7 @@ export type IntervalMetricsSummary = {
 	cpuCoveragePercent: number;
 	ramMeasuredSamples: number;
 	ramCoveragePercent: number;
+	temperatureMeasuredSamples: number;
 	intervalStart: string;
 	intervalEnd: string;
 	intervalDurationSeconds: number;
@@ -34,6 +36,9 @@ export type IntervalMetricsSummary = {
 	averageRamUsagePercent: number | null;
 	minRamUsagePercent: number | null;
 	maxRamUsagePercent: number | null;
+	averageCpuTemperatureCelsius: number | null;
+	minCpuTemperatureCelsius: number | null;
+	maxCpuTemperatureCelsius: number | null;
 };
 
 export type MemoryInfo = {
