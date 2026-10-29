@@ -1,12 +1,19 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
+using NodePilot.Application.Accounts.Models;
+using NodePilot.Application.Interfaces.Accounts;
 
 namespace NodePilot.Api.Auth;
 
 public static class AuthenticationExtensions
 {
     public const string CookieName = "nodepilot.session";
+
+    /// <summary>Users, invitations and service settings.</summary>
+    public const string AdminPolicy = "Admin";
 
     public static IServiceCollection AddCookieAuthentication(
         this IServiceCollection services,
@@ -44,6 +51,7 @@ public static class AuthenticationExtensions
                     context.Response.StatusCode = StatusCodes.Status403Forbidden;
                     return Task.CompletedTask;
                 };
+                options.Events.OnValidatePrincipal = ValidateAccountAsync;
             });
 
         services
@@ -56,8 +64,35 @@ public static class AuthenticationExtensions
             .AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .Build());
+                .Build())
+            .AddPolicy(AdminPolicy, policy => policy
+                .RequireAuthenticatedUser()
+                .RequireRole(nameof(UserRole.Admin)));
 
         return services;
+    }
+
+    /// <summary>
+    /// Runs for every request with a session cookie. A removed account is signed out at once,
+    /// and a changed role takes effect immediately instead of when the cookie expires.
+    /// </summary>
+    private static async Task ValidateAccountAsync(CookieValidatePrincipalContext context)
+    {
+        int? userId = context.Principal?.GetUserId();
+        var accounts = context.HttpContext.RequestServices.GetRequiredService<IUserAccountRepository>();
+        var account = userId is null ? null : await accounts.GetByIdAsync(userId.Value, context.HttpContext.RequestAborted);
+
+        if (account is null)
+        {
+            context.RejectPrincipal();
+            await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return;
+        }
+
+        if (context.Principal!.FindFirstValue(ClaimTypes.Role) != account.Role.ToString())
+        {
+            context.ReplacePrincipal(AccountPrincipal.Create(account));
+            context.ShouldRenew = true;
+        }
     }
 }
