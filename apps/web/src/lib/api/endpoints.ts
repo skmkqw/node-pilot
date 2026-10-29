@@ -2,13 +2,18 @@ import { ApiError, apiUrl, request, toApiError } from "./client";
 import type {
 	AdBlockerStatus,
 	AuthStatus,
+	CreatedInvitation,
 	CurrentUser,
 	DirectoryListing,
 	FileEntry,
 	IntervalMetricsSummary,
+	InvitationPreview,
+	InvitationSummary,
 	PiHoleConnectionInfo,
 	SystemMetric,
 	SystemOverview,
+	UserRole,
+	UserSummary,
 } from "./types";
 
 export const authApi = {
@@ -35,6 +40,40 @@ export const authApi = {
 		}),
 
 	logout: () => request<void>("/api/auth/logout", { method: "POST" }),
+};
+
+/** Administrators only. */
+export const usersApi = {
+	list: (signal?: AbortSignal) => request<UserSummary[]>("/api/users", { signal }),
+
+	setRole: (id: number, role: UserRole) =>
+		request<UserSummary>(`/api/users/${id}/role`, { method: "PUT", body: { role } }),
+
+	remove: (id: number) => request<void>(`/api/users/${id}`, { method: "DELETE" }),
+};
+
+/** Creating and revoking links: administrators only. */
+export const invitationsApi = {
+	list: (signal?: AbortSignal) => request<InvitationSummary[]>("/api/invitations", { signal }),
+
+	create: (role: UserRole, validForHours: number) =>
+		request<CreatedInvitation>("/api/invitations", { method: "POST", body: { role, validForHours } }),
+
+	revoke: (id: number) => request<void>(`/api/invitations/${id}`, { method: "DELETE" }),
+
+	/** Public: what the invited person sees before creating an account. */
+	preview: (token: string, signal?: AbortSignal) =>
+		request<InvitationPreview>(`/api/invite/${encodeURIComponent(token)}`, { signal }),
+
+	/** Public: creates the account and signs the new user in. */
+	accept: (token: string, username: string, password: string) =>
+		request<CurrentUser>(`/api/invite/${encodeURIComponent(token)}/accept`, {
+			method: "POST",
+			body: { username, password },
+		}),
+
+	/** Link to the web app's invite page, shared with the invited person. */
+	link: (token: string) => `${window.location.origin}/invite/${token}`,
 };
 
 export const systemApi = {

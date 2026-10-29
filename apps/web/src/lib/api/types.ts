@@ -110,14 +110,47 @@ export type AdBlockerStatus = {
 	checkedAtUtc: string;
 };
 
+export type UserRole = "Admin" | "Member";
+
 export type CurrentUser = {
 	username: string;
+	role: UserRole;
 };
 
 export type AuthStatus = {
 	setupRequired: boolean;
 	authenticated: boolean;
 	username: string | null;
+	role: UserRole | null;
+};
+
+export type UserSummary = {
+	id: number;
+	username: string;
+	role: UserRole;
+	createdAtUtc: string;
+};
+
+export type InvitationSummary = {
+	id: number;
+	role: UserRole;
+	createdBy: string;
+	createdAtUtc: string;
+	expiresAtUtc: string;
+};
+
+/** Returned once on creation; the token cannot be retrieved again. */
+export type CreatedInvitation = {
+	id: number;
+	token: string;
+	role: UserRole;
+	expiresAtUtc: string;
+};
+
+export type InvitationPreview = {
+	role: UserRole;
+	invitedBy: string;
+	expiresAtUtc: string;
 };
 
 export type PiHoleSettingsSource = "None" | "App" | "Environment";

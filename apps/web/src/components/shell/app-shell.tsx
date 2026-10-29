@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { FolderOpen, LayoutDashboard, LogOut, Settings } from "lucide-react";
+import { FolderOpen, LayoutDashboard, LogOut, Settings, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -9,9 +9,10 @@ import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/cn";
 
 const NAV_ITEMS = [
-	{ href: "/", label: "Dashboard", code: "01", icon: LayoutDashboard },
-	{ href: "/files", label: "Files & Media", code: "02", icon: FolderOpen },
-	{ href: "/settings", label: "Settings", code: "03", icon: Settings },
+	{ href: "/", label: "Dashboard", code: "01", icon: LayoutDashboard, adminOnly: false },
+	{ href: "/files", label: "Files & Media", code: "02", icon: FolderOpen, adminOnly: false },
+	{ href: "/users", label: "Users", code: "03", icon: Users, adminOnly: true },
+	{ href: "/settings", label: "Settings", code: "04", icon: Settings, adminOnly: false },
 ] as const;
 
 function isActive(pathname: string, href: string) {
@@ -20,7 +21,8 @@ function isActive(pathname: string, href: string) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
 	const pathname = usePathname();
-	const { user, logout } = useAuth();
+	const { user, isAdmin, logout } = useAuth();
+	const navItems = NAV_ITEMS.filter((item) => isAdmin || !item.adminOnly);
 
 	return (
 		<div className="min-h-screen lg:pl-[18.5rem]">
@@ -40,7 +42,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 				</Link>
 
 				<nav className="flex flex-col gap-2 p-4" aria-label="Main">
-					{NAV_ITEMS.map((item) => {
+					{navItems.map((item) => {
 						const active = isActive(pathname, item.href);
 						const Icon = item.icon;
 
@@ -72,8 +74,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 						<div className="min-w-0 flex-1">
 							<p className="truncate text-sm font-bold">{user?.username}</p>
 							<p className="label flex items-center gap-1.5 text-muted">
-								<span className="led size-2.5 border-[1.5px] bg-ok" />
-								Admin
+								<span className={cn("led size-2.5 border-[1.5px]", isAdmin ? "bg-accent" : "bg-ok")} />
+								{user?.role}
 							</p>
 						</div>
 						<button
@@ -119,9 +121,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 			{/* Mobile tab bar */}
 			<nav
 				aria-label="Main"
-				className="panel fixed inset-x-4 bottom-[max(env(safe-area-inset-bottom),1rem)] z-40 grid grid-cols-3 lg:hidden"
+				className={cn(
+					"panel fixed inset-x-4 bottom-[max(env(safe-area-inset-bottom),1rem)] z-40 grid lg:hidden",
+					navItems.length === 4 ? "grid-cols-4" : "grid-cols-3",
+				)}
 			>
-				{NAV_ITEMS.map((item, index) => {
+				{navItems.map((item, index) => {
 					const active = isActive(pathname, item.href);
 					const Icon = item.icon;
 
