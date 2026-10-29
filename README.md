@@ -11,6 +11,58 @@ NodePilot is a lightweight, unified control panel for a home server. One web app
 | **Setup & settings** | First-start wizard creates the administrator account; Settings lets you change the password and connect/test Pi-hole. No `.env` editing needed. |
 | **Sign-in** | HTTP-only session cookie, salted PBKDF2 password hash, login rate limiting. |
 
+## Quick start
+
+You need **.NET SDK 10** and **Node.js 20.9+** ([nvm](https://github.com/nvm-sh/nvm) is enough: the script switches versions itself). Then:
+
+```bash
+git clone https://github.com/skmkqw/node-pilot.git
+cd node-pilot
+./start.sh
+```
+
+The script checks the requirements, installs dependencies on the first run, builds the backend and starts both parts in one terminal. When it is ready it prints where to open the app:
+
+```text
+================  NodePilot is running  ================
+  This computer:     http://localhost:3000
+  Phone (Wi-Fi):     http://192.168.1.20:3000   (same network)
+  Phone (USB cable): ...
+  Stop:              Ctrl+C
+```
+
+On the first visit NodePilot shows a **setup screen**: create the administrator account, optionally connect Pi-hole, done. No configuration files are needed.
+
+| Command | When to use it |
+|---|---|
+| `./start.sh` | Normal start |
+| `./start.sh --clean` | The page keeps reloading or looks outdated (clears the Next.js cache) |
+| `./start.sh --install` | After pulling changes that added web packages |
+
+### Opening it on a phone
+
+- **Same Wi-Fi:** open the *Phone (Wi-Fi)* address the script prints, e.g. `http://192.168.1.20:3000`. University, office and guest networks often block devices from reaching each other; then use the cable.
+- **USB cable (any network):** enable *USB debugging* on the phone (Developer options), plug it in and accept the prompt. If the phone was connected when you ran `./start.sh`, it is set up automatically; otherwise run
+  ```bash
+  adb reverse tcp:3000 tcp:3000 && adb reverse tcp:5000 tcp:5000
+  ```
+  and open `http://localhost:3000` on the phone. Repeat after reconnecting the cable.
+
+### Why two servers?
+
+NodePilot is a client–server application: the **backend** (ASP.NET Core, port 5000) reads system metrics, manages files, streams video and talks to Pi-hole; the **web app** (Next.js, port 3000) is the user interface and gets all data from the backend's REST API. `./start.sh` runs both together.
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `Port 5000/3000 is already in use` | NodePilot (or something else) is already running; stop it first. |
+| `.NET SDK 10 is required` | Install it from <https://dotnet.microsoft.com/download/dotnet/10.0>. |
+| `Node.js 20.9 or newer is required` | `nvm install 22` |
+| Page stuck on "Connecting…" or reloading in a loop | `./start.sh --clean` |
+| Phone: "This site can't be reached" | Use the USB cable, or check that the phone is on the same Wi-Fi and has no VPN active. |
+| Forgot the password | Stop NodePilot, delete `apps/backend/src/NodePilot.Api/data/nodepilot.db` (this also removes the metric history) and start again to get the setup screen. |
+
 ## Monorepo structure
 
 ```text
@@ -23,6 +75,7 @@ nodepilot/
 │  │  └─ tests/NodePilot.Api.Tests     # unit + integration tests (NUnit)
 │  └─ web/                     # Next.js 16 / React 19 client (Tailwind 4, Motion)
 ├─ documents/                  # API reference, metrics notes, mockups, Postman
+├─ start.sh                   # one-command local start (see Quick start)
 ├─ compose.yaml
 └─ .env.example
 ```
@@ -64,34 +117,34 @@ Advanced settings live in `apps/backend/src/NodePilot.Api/appsettings.json`: mon
 
 The `data/` folder next to the backend holds the database and the encryption keys (`data/keys`). Back up both together.
 
-## Running
+## Running with Docker Compose
 
-### Option 1: Docker Compose
+For a permanent installation on the home server:
 
 ```bash
-cp .env.example .env    # optional
-docker compose up --build
+cp .env.example .env    # optional: set NODEPILOT_FILES_DIR to the folder you want to share
+docker compose up --build -d
 ```
 
-- Web: <http://localhost:3000> (or `http://<server-ip>:3000` from your phone)
+- Web: <http://localhost:3000> (or `http://<server-ip>:3000` from a phone)
 - Backend: <http://localhost:5000>, health check at `/health`
 
-The metrics database is kept in the `nodepilot-data` volume, and `NODEPILOT_FILES_DIR` is mounted as the file manager root.
+Both containers restart automatically. The database and encryption keys are kept in the `nodepilot-data` volume, and `NODEPILOT_FILES_DIR` is mounted as the file manager root.
 
-### Option 2: Run the apps natively
+### Running the parts separately
+
+Useful when working on only one side:
 
 ```bash
 # backend
 cd apps/backend/src/NodePilot.Api
 dotnet run
 
-# web (in a second terminal)
+# web app (second terminal)
 cd apps/web
 npm install
 npm run dev
 ```
-
-Open <http://localhost:3000>. The first visit shows the setup screen.
 
 ## Tests
 
