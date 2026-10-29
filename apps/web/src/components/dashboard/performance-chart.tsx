@@ -25,7 +25,8 @@ const METRIC_OPTIONS = [
 	{ value: "ram", label: "RAM" },
 ] as const;
 
-const HEIGHT = 260;
+/** Minimum height; the chart grows to fill its card when the row is taller. */
+const MIN_HEIGHT = 260;
 const PADDING = { top: 14, right: 44, bottom: 28, left: 4 };
 
 type Point = {
@@ -77,7 +78,7 @@ function segments(points: Point[]) {
 export function PerformanceChart() {
 	const [metric, setMetric] = useState<MetricKey>("cpu");
 	const [range, setRange] = useState<RangeKey>("1h");
-	const [width, setWidth] = useState(640);
+	const [size, setSize] = useState({ width: 640, height: MIN_HEIGHT });
 	const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 
@@ -100,7 +101,9 @@ export function PerformanceChart() {
 		const element = containerRef.current;
 		if (!element) return;
 
-		const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+		const observer = new ResizeObserver(([entry]) =>
+			setSize({ width: entry.contentRect.width, height: Math.max(entry.contentRect.height, MIN_HEIGHT) }),
+		);
 		observer.observe(element);
 		return () => observer.disconnect();
 	}, []);
@@ -110,8 +113,9 @@ export function PerformanceChart() {
 		return buildPoints(history.data.summaries, metric, history.data.start, history.data.end, intervalMs);
 	}, [history.data, metric, intervalMs]);
 
+	const { width, height } = size;
 	const innerWidth = Math.max(width - PADDING.left - PADDING.right, 10);
-	const innerHeight = HEIGHT - PADDING.top - PADDING.bottom;
+	const innerHeight = height - PADDING.top - PADDING.bottom;
 	const x = useCallback(
 		(index: number) => PADDING.left + (points.length <= 1 ? innerWidth / 2 : (index / (points.length - 1)) * innerWidth),
 		[points.length, innerWidth],
@@ -171,13 +175,13 @@ export function PerformanceChart() {
 
 			<div className="mt-4 flex flex-wrap gap-2 sm:hidden">{controls("sm")}</div>
 
-			<div ref={containerRef} className="relative mt-5 flex-1 border-2 border-ink bg-ground/40" style={{ minHeight: HEIGHT }}>
+			<div ref={containerRef} className="relative mt-5 flex-1 border-2 border-ink bg-ground/40" style={{ minHeight: MIN_HEIGHT }}>
 				{history.isLoading && !history.data ? (
 					<div className="skeleton absolute inset-0 border-0" />
 				) : (
 					<svg
 						width={width}
-						height={HEIGHT}
+						height={height}
 						className="absolute inset-0 touch-none select-none overflow-visible"
 						onPointerMove={handlePointer}
 						onPointerLeave={() => setHoverIndex(null)}
@@ -206,7 +210,7 @@ export function PerformanceChart() {
 							<text
 								key={`${index}-${position}`}
 								x={x(index)}
-								y={HEIGHT - 8}
+								y={height - 8}
 								fontSize="11"
 								fontFamily="var(--font-space-mono)"
 								fill="var(--ink)"
