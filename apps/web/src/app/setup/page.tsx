@@ -21,9 +21,9 @@ const STEPS = [
 ];
 
 const slide = {
-	initial: (direction: number) => ({ opacity: 0, x: direction * 40, filter: "blur(4px)" }),
-	animate: { opacity: 1, x: 0, filter: "blur(0px)" },
-	exit: (direction: number) => ({ opacity: 0, x: direction * -40, filter: "blur(4px)" }),
+	initial: { opacity: 0, x: 40 },
+	animate: { opacity: 1, x: 0 },
+	exit: { opacity: 0, x: -40 },
 };
 
 export default function SetupPage() {
@@ -44,31 +44,31 @@ export default function SetupPage() {
 	return (
 		<div className="grid min-h-screen place-items-center px-4 py-10">
 			<motion.div
-				initial={{ opacity: 0, y: 24, scale: 0.97 }}
-				animate={{ opacity: 1, y: 0, scale: 1 }}
-				transition={{ type: "spring", stiffness: 200, damping: 26 }}
+				initial={{ opacity: 0, y: 24 }}
+				animate={{ opacity: 1, y: 0 }}
+				transition={{ type: "spring", stiffness: 380, damping: 32 }}
 				className="w-full max-w-lg"
 			>
-				<div className="mb-8 flex flex-col items-center text-center">
-					<Logo size={52} />
-					<h1 className="mt-4 text-2xl font-semibold tracking-tight text-white">Welcome to NodePilot</h1>
-					<p className="mt-1.5 text-sm text-muted">Let&apos;s get your home server ready. It only takes a minute.</p>
+				<div className="mb-8 flex items-center gap-4">
+					<Logo size={56} />
+					<div>
+						<p className="label text-muted">First start · Unit 01</p>
+						<h1 className="text-3xl font-bold uppercase leading-tight">Welcome to NodePilot</h1>
+					</div>
 				</div>
 
 				<Stepper step={step} />
 
-				<div className="glass relative mt-6 overflow-hidden rounded-[2rem] p-7 sm:p-8">
-					<div className="pointer-events-none absolute -top-24 left-1/2 h-48 w-72 -translate-x-1/2 rounded-full bg-cyan-400/15 blur-3xl" />
-					<AnimatePresence mode="wait" custom={1} initial={false}>
+				<div className="panel mt-6">
+					<AnimatePresence mode="wait" initial={false}>
 						<motion.div
 							key={step}
-							custom={1}
 							variants={slide}
 							initial="initial"
 							animate="animate"
 							exit="exit"
-							transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-							className="relative"
+							transition={{ type: "spring", stiffness: 520, damping: 40 }}
+							className="p-6 sm:p-8"
 						>
 							{step === 0 ? <AccountStep onDone={() => setStep(1)} /> : null}
 							{step === 1 ? <PiHoleStep onDone={() => setStep(2)} /> : null}
@@ -83,38 +83,29 @@ export default function SetupPage() {
 
 function Stepper({ step }: { step: number }) {
 	return (
-		<div className="relative mx-auto flex max-w-sm items-center justify-between px-2">
-			<div className="absolute inset-x-8 top-5 h-px bg-white/10">
-				<motion.div
-					className="h-full bg-gradient-to-r from-cyan-300 to-violet-300 shadow-[0_0_8px_rgba(103,232,249,0.8)]"
-					initial={false}
-					animate={{ width: `${(step / (STEPS.length - 1)) * 100}%` }}
-					transition={{ type: "spring", stiffness: 120, damping: 22 }}
-				/>
-			</div>
+		<ol className="grid grid-cols-3 border-2 border-ink bg-surface">
 			{STEPS.map((item, index) => {
 				const done = index < step;
 				const active = index === step;
 
 				return (
-					<div key={item.title} className="relative flex flex-col items-center gap-2">
-						<motion.div
-							initial={false}
-							animate={{ scale: active ? 1.08 : 1 }}
+					<li key={item.title} className={cn("relative flex items-center gap-2 px-3 py-2.5", index > 0 && "border-l-2 border-ink")}>
+						{active ? <motion.span layoutId="setup-step" transition={{ type: "spring", stiffness: 600, damping: 40 }} className="absolute inset-0 bg-ink" /> : null}
+						<span
 							className={cn(
-								"grid size-10 place-items-center rounded-2xl border transition-colors duration-300",
-								done && "border-emerald-300/40 bg-emerald-400/20 text-emerald-200",
-								active && "border-cyan-300/50 bg-cyan-400/15 text-cyan-200 shadow-[0_0_24px_-4px_rgba(34,211,238,0.8)]",
-								!done && !active && "border-white/10 bg-[#0a0f1c] text-slate-500",
+								"relative grid size-7 shrink-0 place-items-center border-2 font-mono text-xs font-bold",
+								done && "border-ink bg-ok",
+								active && "border-accent bg-accent text-ink",
+								!done && !active && "border-ink bg-ground",
 							)}
 						>
-							{done ? <Check className="size-4" /> : <item.icon className="size-4" />}
-						</motion.div>
-						<span className={cn("text-[0.7rem] font-medium", active ? "text-white" : "text-slate-500")}>{item.title}</span>
-					</div>
+							{done ? <Check className="size-4" /> : index + 1}
+						</span>
+						<span className={cn("label relative truncate", active ? "text-accent" : "text-ink")}>{item.title}</span>
+					</li>
 				);
 			})}
-		</div>
+		</ol>
 	);
 }
 
@@ -145,20 +136,15 @@ function AccountStep({ onDone }: { onDone: () => void }) {
 	};
 
 	return (
-		<form onSubmit={submit} className="space-y-4">
+		<form onSubmit={submit} className="space-y-5">
 			<div>
-				<h2 className="text-lg font-semibold text-white">Create your administrator account</h2>
-				<p className="mt-1 text-sm text-muted">You&apos;ll use it to sign in to NodePilot from any device.</p>
+				<p className="label text-muted">Step 1 / 3</p>
+				<h2 className="text-xl font-bold uppercase">Create the administrator account</h2>
+				<p className="mt-1 font-mono text-xs text-muted">You&apos;ll use it to sign in to NodePilot from any device.</p>
 			</div>
 
 			<Field icon={<User className="size-4" />} label="Username" hint="3–32 characters: letters, digits, . _ -">
-				<input
-					value={username}
-					onChange={(event) => setUsername(event.target.value)}
-					autoComplete="username"
-					required
-					className={inputClassName}
-				/>
+				<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required className={inputClassName} />
 			</Field>
 
 			<div>
@@ -177,14 +163,14 @@ function AccountStep({ onDone }: { onDone: () => void }) {
 			<PasswordField
 				icon={<KeyRound className="size-4" />}
 				label="Repeat password"
-				hint={mismatch ? <span className="text-rose-300">The passwords do not match.</span> : undefined}
+				hint={mismatch ? <span className="font-bold text-danger">THE PASSWORDS DO NOT MATCH.</span> : undefined}
 				value={confirm}
 				onChange={(event) => setConfirm(event.target.value)}
 				autoComplete="new-password"
 				required
 			/>
 
-			{error ? <p className="rounded-2xl border border-rose-300/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</p> : null}
+			{error ? <p className="border-2 border-ink bg-alert px-3 py-2.5 font-mono text-sm font-bold">{error}</p> : null}
 
 			<Button type="submit" variant="primary" size="lg" className="group w-full" isLoading={isSubmitting} disabled={!canSubmit}>
 				Create account
@@ -198,9 +184,10 @@ function PiHoleStep({ onDone }: { onDone: () => void }) {
 	return (
 		<div className="space-y-5">
 			<div>
-				<h2 className="text-lg font-semibold text-white">Connect your Pi-hole</h2>
-				<p className="mt-1 text-sm text-muted">
-					Optional. Lets you switch network-wide ad blocking from the dashboard. You can do this later in Settings.
+				<p className="label text-muted">Step 2 / 3 · Optional</p>
+				<h2 className="text-xl font-bold uppercase">Connect your Pi-hole</h2>
+				<p className="mt-1 font-mono text-xs text-muted">
+					Lets you switch network-wide ad blocking from the dashboard. You can do this later in Settings.
 				</p>
 			</div>
 			<PiHoleForm
@@ -218,41 +205,30 @@ function PiHoleStep({ onDone }: { onDone: () => void }) {
 
 function DoneStep({ onFinish }: { onFinish: () => void }) {
 	return (
-		<div className="flex flex-col items-center py-4 text-center">
-			<div className="relative grid size-20 place-items-center">
-				<motion.span
-					className="absolute inset-0 rounded-full border border-emerald-300/40"
-					animate={{ scale: [1, 1.6], opacity: [0.6, 0] }}
-					transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }}
-				/>
-				<svg viewBox="0 0 80 80" className="size-20">
-					<motion.circle
-						cx="40"
-						cy="40"
-						r="34"
-						fill="rgba(52,211,153,0.12)"
-						stroke="#34d399"
-						strokeWidth="3"
-						initial={{ pathLength: 0 }}
-						animate={{ pathLength: 1 }}
-						transition={{ duration: 0.6, ease: "easeOut" }}
-					/>
+		<div className="flex flex-col items-center py-2 text-center">
+			<motion.div
+				initial={{ scale: 0.6, rotate: -8 }}
+				animate={{ scale: 1, rotate: 0 }}
+				transition={{ type: "spring", stiffness: 500, damping: 18 }}
+				className="grid size-20 place-items-center border-2 border-ink bg-ok shadow-[6px_6px_0_var(--ink)]"
+			>
+				<svg viewBox="0 0 48 48" className="size-11" aria-hidden>
 					<motion.path
-						d="M26 41 l9 9 l19 -20"
+						d="M11 25 l9 9 l17 -19"
 						fill="none"
-						stroke="#d1fae5"
-						strokeWidth="4"
-						strokeLinecap="round"
-						strokeLinejoin="round"
+						stroke="var(--ink)"
+						strokeWidth="5"
+						strokeLinecap="square"
 						initial={{ pathLength: 0 }}
 						animate={{ pathLength: 1 }}
-						transition={{ duration: 0.4, delay: 0.5, ease: "easeOut" }}
+						transition={{ duration: 0.35, delay: 0.25 }}
 					/>
 				</svg>
-			</div>
-			<h2 className="mt-6 text-xl font-semibold text-white">You&apos;re all set</h2>
-			<p className="mt-2 max-w-sm text-sm text-muted">
-				NodePilot is ready. Everything else, including the Pi-hole connection and your password, can be changed in Settings.
+			</motion.div>
+			<p className="label mt-6 text-muted">Step 3 / 3</p>
+			<h2 className="text-2xl font-bold uppercase">You&apos;re all set</h2>
+			<p className="mt-2 max-w-sm font-mono text-xs leading-5 text-muted">
+				NodePilot is ready. The Pi-hole connection and your password can be changed any time in Settings.
 			</p>
 			<Button variant="primary" size="lg" className="group mt-7" onClick={onFinish}>
 				Open dashboard <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
