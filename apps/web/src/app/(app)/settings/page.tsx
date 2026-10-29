@@ -25,30 +25,30 @@ export default function SettingsPage() {
 		<>
 			<PageHeader title="Settings" description="Your account and the services NodePilot connects to." />
 
-			<motion.div variants={container} initial="hidden" animate="show" className="grid gap-4 sm:gap-5 xl:grid-cols-2">
-				<Card glow="#22d3ee" className="p-5 sm:p-6" variants={item}>
+			<motion.div variants={container} initial="hidden" animate="show" className="grid items-start gap-5 sm:gap-6 xl:grid-cols-2">
+				<Card className="p-5 sm:p-6" variants={item}>
 					<CardHeader
 						icon={<UserCog className="size-5" />}
-						accent="#22d3ee"
+						channel="CFG-01"
 						title="Account"
-						subtitle={<>Signed in as <span className="text-slate-200">{user?.username}</span></>}
+						subtitle={<>SIGNED IN AS <span className="font-bold text-ink">{user?.username}</span></>}
 					/>
 					<div className="mt-6">
 						<ChangePasswordForm />
 					</div>
 				</Card>
 
-				<Card id="pihole" glow="#34d399" className="p-5 sm:p-6" variants={item}>
+				<Card id="pihole" className="scroll-mt-24 p-5 sm:p-6" variants={item}>
 					<CardHeader
 						icon={<ShieldCheck className="size-5" />}
-						accent="#34d399"
+						channel="CFG-02"
 						title="Ad blocker (Pi-hole)"
 						subtitle={
 							piHole.data?.source === "None"
-								? "Not connected"
+								? "NOT CONNECTED"
 								: piHole.data?.baseUrl
-									? `Connected to ${piHole.data.baseUrl}`
-									: "Loading…"
+									? `CONNECTED · ${piHole.data.baseUrl}`
+									: "LOADING…"
 						}
 					/>
 					<div className="mt-6">
@@ -61,8 +61,8 @@ export default function SettingsPage() {
 							/>
 						) : (
 							<div className="space-y-4">
-								<div className="skeleton h-16 rounded-2xl" />
-								<div className="skeleton h-16 rounded-2xl" />
+								<div className="skeleton h-16" />
+								<div className="skeleton h-16" />
 							</div>
 						)}
 					</div>
