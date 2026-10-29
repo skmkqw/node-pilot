@@ -2,14 +2,39 @@
 
 NodePilot is a lightweight, unified control panel for a home server. One web app, reachable from any device in your home network, replaces the terminal and the separate admin panels for the everyday jobs:
 
+![NodePilot dashboard: CPU, memory, temperature and disk cards, performance history, Pi-hole ad blocker and host details](documents/screenshots/dashboard.png)
+
 | Feature | What it does |
 |---|---|
-| **Live dashboard** | CPU, memory, CPU temperature and disk usage as animated gauges, a performance history chart (15 min – 24 h), uptime, load average and host details. |
+| **Live dashboard** | CPU, memory, CPU temperature and disk usage as animated gauges, a CPU / memory / temperature history chart (15 min – 24 h), uptime, load average and host details. |
 | **Files & media** | Browse a sandboxed folder on the server, upload (drag & drop), create folders, download and delete files. |
 | **Video player** | Stream MP4, WebM, MOV and OGV videos (plus audio and images) right in the browser, with seeking via HTTP range requests. |
 | **Ad blocking** | Pi-hole (v6) integration: see today's statistics and switch network-wide blocking on/off or pause it for 5 min – 1 h. |
 | **Setup & settings** | First-start wizard creates the administrator account; Settings lets you change the password and connect/test Pi-hole. No `.env` editing needed. |
+| **Users** | Invite your household with one-time links; Admin and Member roles. |
 | **Sign-in** | HTTP-only session cookie, salted PBKDF2 password hash, login rate limiting. |
+
+## Screenshots
+
+| | |
+|:-:|:-:|
+| ![First-start wizard](documents/screenshots/setup.png) | ![Sign-in page](documents/screenshots/login.png) |
+| **First start:** create the administrator account | **Sign in** from any device |
+| ![File browser](documents/screenshots/files.png) | ![Video player](documents/screenshots/player.jpg) |
+| **Files & Media:** browse, upload, download | **Video player** with seeking, right in the browser |
+| ![Users page with an invite link](documents/screenshots/users.png) | ![Invite page](documents/screenshots/invite.png) |
+| **Users:** one-time invite links and roles | **Invite page:** the new user picks a password |
+| ![Settings](documents/screenshots/settings.png) | ![Temperature history](documents/screenshots/performance-temp.png) |
+| **Settings:** password and Pi-hole connection | **Performance:** CPU temperature over 15 minutes |
+
+<p align="center">
+  <img src="documents/screenshots/mobile-dashboard.png" alt="Dashboard on a phone" width="260">
+  &nbsp;&nbsp;
+  <img src="documents/screenshots/mobile-files.png" alt="Files on a phone" width="260">
+</p>
+<p align="center"><b>On a phone:</b> the same panel with a bottom tab bar.</p>
+
+<sub>Screenshots use a demo instance: sample files, demo accounts and a stand-in Pi-hole with example statistics.</sub>
 
 ## Quick start
 

@@ -52,7 +52,6 @@ public class InvitationsController : BaseController
 /// <summary>Public side of an invite link: shown to the invited person, who is not signed in yet.</summary>
 [Route("api/invite")]
 [AllowAnonymous]
-[EnableRateLimiting(RateLimitingExtensions.LoginPolicy)]
 public class InviteController : BaseController
 {
     private readonly IInvitationService _invitations;
@@ -70,7 +69,12 @@ public class InviteController : BaseController
         return result.Match(onValue: Ok, onError: Problem);
     }
 
-    /// <summary>Creates the account and signs the new user in.</summary>
+    /// <summary>
+    /// Creates the account and signs the new user in. Shares the login rate limit; the preview
+    /// above does not, so opening or refreshing the link never locks anyone out (a 256-bit token
+    /// cannot be guessed, so the limit is about slowing down account creation, not the lookup).
+    /// </summary>
+    [EnableRateLimiting(RateLimitingExtensions.LoginPolicy)]
     [HttpPost("{token}/accept")]
     public async Task<IActionResult> AcceptAsync(string token, [FromBody] CredentialsRequest request, CancellationToken ct)
     {

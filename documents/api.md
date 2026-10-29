@@ -44,12 +44,12 @@ Every endpoint except `/health`, `GET /api/auth/status`, `POST /api/auth/setup`,
 
 The web app turns the token into `http://<host>:3000/invite/<token>`. Tokens are 32 random bytes (base64url); the database stores only their SHA-256 hash.
 
-### Invite page (public, rate-limited like login)
+### Invite page (public)
 
 | Method | Path | Body | Result |
 |---|---|---|---|
 | GET | `/api/invite/{token}` | – | `{ "role", "invitedBy", "expiresAtUtc" }` |
-| POST | `/api/invite/{token}/accept` | `{ "username", "password" }` | `201 { "username", "role" }` + cookie. `409` if the username is taken (the link stays usable). |
+| POST | `/api/invite/{token}/accept` | `{ "username", "password" }` | `201 { "username", "role" }` + cookie. `409` if the username is taken (the link stays usable). Shares the login rate limit. |
 
 An unknown, expired, used or revoked link always answers `404` with the same message, so a guessed token reveals nothing.
 
