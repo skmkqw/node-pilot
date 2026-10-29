@@ -44,7 +44,7 @@ export function apiUrl(path: string, query?: Record<string, string | number | bo
 }
 
 type RequestOptions = {
-	method?: "GET" | "POST" | "DELETE";
+	method?: "GET" | "POST" | "PUT" | "DELETE";
 	query?: Record<string, string | number | boolean | undefined>;
 	body?: unknown;
 	signal?: AbortSignal;
@@ -87,7 +87,12 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 }
 
 export async function toApiError(response: Response, path: string): Promise<ApiError> {
-	if (response.status === 401 && !path.startsWith("/api/auth/login")) {
+	// A 401 from these endpoints means "wrong credentials", not "session expired".
+	const isCredentialCheck = ["/api/auth/login", "/api/auth/setup", "/api/auth/password"].some((prefix) =>
+		path.startsWith(prefix),
+	);
+
+	if (response.status === 401 && !isCredentialCheck) {
 		window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
 	}
 

@@ -32,22 +32,37 @@ public sealed class NodePilotApiFactory : WebApplicationFactory<Program>
         builder.ConfigureAppConfiguration((_, configuration) =>
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Auth:Username"] = Username,
-                ["Auth:Password"] = Password,
+                // Integration tests sign in many times; production keeps the default of 5.
+                ["Auth:LoginAttemptsPerMinute"] = "1000",
                 ["FileManager:RootPath"] = FilesRoot,
                 ["PiHole:BaseUrl"] = string.Empty,
                 ["PiHole:Password"] = string.Empty,
             }));
     }
 
+    /// <summary>Completes the first-start setup (once per factory) and signs a new client in.</summary>
     public async Task<HttpClient> CreateAuthenticatedClientAsync()
     {
+        await EnsureAdministratorAsync();
+
         var client = CreateClient();
 
         var response = await client.PostAsJsonAsync("/api/auth/login", new { username = Username, password = Password });
         response.EnsureSuccessStatusCode();
 
         return client;
+    }
+
+    public async Task EnsureAdministratorAsync()
+    {
+        using var client = CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/auth/setup", new { username = Username, password = Password });
+
+        if (response.StatusCode != System.Net.HttpStatusCode.Conflict)
+        {
+            response.EnsureSuccessStatusCode();
+        }
     }
 
     protected override void Dispose(bool disposing)

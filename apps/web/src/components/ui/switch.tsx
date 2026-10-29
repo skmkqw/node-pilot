@@ -11,6 +11,7 @@ type SwitchProps = {
 	size?: "md" | "lg";
 };
 
+/** Rocker-style toggle: a square knob that snaps between OFF and ON. */
 export function Switch({ checked, onChange, disabled, label, size = "md" }: SwitchProps) {
 	const large = size === "lg";
 
@@ -23,21 +24,18 @@ export function Switch({ checked, onChange, disabled, label, size = "md" }: Swit
 			disabled={disabled}
 			onClick={() => onChange(!checked)}
 			className={cn(
-				"relative flex shrink-0 items-center rounded-full border p-1 transition-colors duration-300 outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60 disabled:cursor-not-allowed disabled:opacity-50",
-				large ? "h-9 w-16" : "h-7 w-12",
-				checked
-					? "justify-end border-emerald-300/30 bg-emerald-400/80 shadow-[0_0_24px_-4px_rgba(52,211,153,0.8)]"
-					: "justify-start border-white/10 bg-white/[0.08]",
+				"relative flex shrink-0 items-center border-2 border-ink p-[3px] shadow-[3px_3px_0_var(--ink)] transition-colors duration-200 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-50",
+				large ? "h-10 w-[4.5rem]" : "h-8 w-14",
+				checked ? "justify-end bg-ink" : "justify-start bg-surface",
 			)}
 		>
 			<motion.span
 				layout
-				transition={{ type: "spring", stiffness: 600, damping: 32 }}
-				className={cn(
-					"block rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.35)]",
-					large ? "size-7" : "size-5",
-				)}
-			/>
+				transition={{ type: "spring", stiffness: 800, damping: 35 }}
+				className={cn("grid h-full place-items-center border-2 border-ink font-mono text-[0.6rem] font-bold", large ? "w-8" : "w-6", checked ? "bg-accent text-ink" : "bg-ground text-ink")}
+			>
+				{checked ? "I" : "O"}
+			</motion.span>
 		</button>
 	);
 }

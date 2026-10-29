@@ -1,10 +1,10 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Cpu, HardDrive, MemoryStick, Thermometer, TriangleAlert } from "lucide-react";
+import { Cpu, HardDrive, MemoryStick, Thermometer } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { AdBlockCard } from "@/components/dashboard/adblock-card";
-import { MetricGauge } from "@/components/dashboard/metric-gauge";
+import { MetricMeter } from "@/components/dashboard/metric-meter";
 import { PerformanceChart } from "@/components/dashboard/performance-chart";
 import { SystemCard } from "@/components/dashboard/system-card";
 import { PageHeader } from "@/components/shell/page-header";
@@ -14,12 +14,12 @@ import { usePolling } from "@/lib/use-polling";
 
 const container = {
 	hidden: {},
-	show: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
+	show: { transition: { staggerChildren: 0.06, delayChildren: 0.05 } },
 };
 
 const item = {
-	hidden: { opacity: 0, y: 18, scale: 0.98 },
-	show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring" as const, stiffness: 240, damping: 26 } },
+	hidden: { opacity: 0, y: 16 },
+	show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 420, damping: 34 } },
 };
 
 function greeting() {
@@ -42,17 +42,21 @@ export default function DashboardPage() {
 	const disk = info?.disk;
 	const offline = current.error && !metric;
 
+	const severities = [
+		usageSeverity(metric?.cpuUsagePercent),
+		usageSeverity(metric?.ramUsagePercent),
+		temperatureSeverity(temperature),
+		usageSeverity(disk?.usagePercent),
+	];
+	const warnings = severities.filter((severity) => severity === "critical").length;
+
 	return (
 		<>
 			<PageHeader
 				eyebrow={
 					<>
-						<span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-2.5 py-1 font-medium text-emerald-200">
-							<span className="relative flex size-1.5">
-								<span className="absolute inline-flex size-full rounded-full bg-emerald-400 animate-ping-slow" />
-								<span className="relative inline-flex size-1.5 rounded-full bg-emerald-400" />
-							</span>
-							Live
+						<span className="flex items-center gap-1.5 border-2 border-ink bg-surface px-2 py-1 text-ink">
+							<span className="led size-2.5 animate-blink border-[1.5px] bg-ok" /> Live
 						</span>
 						{info ? (
 							<span>
@@ -61,76 +65,76 @@ export default function DashboardPage() {
 						) : null}
 					</>
 				}
-				title={`${greeting()}, ${user?.username ?? "there"}`}
-				description="Everything your server is doing, at a glance."
+				title={
+					<>
+						{greeting()}, {user?.username ?? "there"}.{" "}
+						{warnings > 0 ? (
+							<span className="whitespace-nowrap bg-ink px-2 text-accent">
+								{warnings} warning{warnings > 1 ? "s" : ""}.
+							</span>
+						) : null}
+					</>
+				}
 			/>
 
 			{offline ? (
-				<motion.div
-					initial={{ opacity: 0, y: -8 }}
-					animate={{ opacity: 1, y: 0 }}
-					className="mb-5 flex items-center gap-3 rounded-2xl border border-rose-300/20 bg-rose-500/10 p-4 text-sm text-rose-100"
-				>
-					<TriangleAlert className="size-5 shrink-0 text-rose-300" />
+				<motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6 flex items-center gap-3 border-2 border-ink bg-accent p-4 font-mono text-sm font-bold">
+					<span className="led animate-blink bg-alert" />
 					{current.error?.message ?? "Live metrics are unavailable."}
 				</motion.div>
 			) : null}
 
-			<motion.div variants={container} initial="hidden" animate="show" className="grid gap-4 sm:gap-5">
-				<div className="grid grid-cols-2 gap-4 sm:gap-5 xl:grid-cols-4">
-					<MetricGauge
+			<motion.div variants={container} initial="hidden" animate="show" className="grid gap-5 sm:gap-6">
+				<div className="grid grid-cols-1 gap-5 min-[480px]:grid-cols-2 sm:gap-6 xl:grid-cols-4">
+					<MetricMeter
+						channel="CH-A"
 						label="CPU"
 						icon={<Cpu className="size-4" />}
 						value={metric?.cpuUsagePercent ?? null}
 						percent={metric?.cpuUsagePercent ?? null}
 						unit="%"
-						color="#22d3ee"
-						colorTo="#60a5fa"
-						severity={usageSeverity(metric?.cpuUsagePercent)}
-						detail={info ? `${info.processorCount} cores · load ${info.loadAverage?.oneMinute.toFixed(2) ?? "—"}` : "Processor load"}
+						severity={severities[0]}
+						detail={info ? `${info.processorCount} CORES · LOAD ${info.loadAverage?.oneMinute.toFixed(2) ?? "—"}` : "PROCESSOR LOAD"}
 					/>
-					<MetricGauge
+					<MetricMeter
+						channel="CH-B"
 						label="Memory"
 						icon={<MemoryStick className="size-4" />}
 						value={metric?.ramUsagePercent ?? memory?.ramUsagePercent ?? null}
 						percent={metric?.ramUsagePercent ?? memory?.ramUsagePercent ?? null}
 						unit="%"
-						color="#a78bfa"
-						colorTo="#e879f9"
-						severity={usageSeverity(metric?.ramUsagePercent)}
-						detail={memory ? `${formatBytes(memory.usedMemoryBytes)} of ${formatBytes(memory.totalMemoryBytes)}` : "RAM in use"}
+						severity={severities[1]}
+						detail={memory ? `${formatBytes(memory.usedMemoryBytes)} / ${formatBytes(memory.totalMemoryBytes)}` : "RAM IN USE"}
 					/>
-					<MetricGauge
-						label="Temperature"
+					<MetricMeter
+						channel="CH-C"
+						label="Thermal"
 						icon={<Thermometer className="size-4" />}
 						value={temperature}
-						percent={temperature === null ? null : Math.min((temperature / 100) * 100, 100)}
+						percent={temperature === null ? null : Math.min(temperature, 100)}
 						unit="°C"
-						color="#fbbf24"
-						colorTo="#f43f5e"
-						severity={temperatureSeverity(temperature)}
+						severity={severities[2]}
 						severityLabels={{ ok: "Optimal", warn: "Warm", critical: "Hot" }}
-						detail="CPU package sensor"
+						detail="CPU PACKAGE"
 						unavailableText="No sensor"
 					/>
-					<MetricGauge
+					<MetricMeter
+						channel="CH-D"
 						label="Disk"
 						icon={<HardDrive className="size-4" />}
 						value={disk?.usagePercent ?? null}
 						percent={disk?.usagePercent ?? null}
 						unit="%"
-						color="#34d399"
-						colorTo="#2dd4bf"
-						severity={usageSeverity(disk?.usagePercent)}
-						detail={disk ? `${formatBytes(disk.availableBytes)} free of ${formatBytes(disk.totalBytes)}` : "Root filesystem"}
+						severity={severities[3]}
+						detail={disk ? `${formatBytes(disk.availableBytes)} FREE / ${formatBytes(disk.totalBytes)}` : "ROOT FILESYSTEM"}
 					/>
 				</div>
 
-				<div className="grid gap-4 sm:gap-5 xl:grid-cols-3">
+				<div className="grid gap-5 sm:gap-6 xl:grid-cols-3">
 					<motion.div variants={item} className="xl:col-span-2">
 						<PerformanceChart />
 					</motion.div>
-					<div className="grid content-start gap-4 sm:gap-5">
+					<div className="grid content-start gap-5 sm:gap-6">
 						<motion.div variants={item}>
 							<AdBlockCard />
 						</motion.div>

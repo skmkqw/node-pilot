@@ -1,11 +1,15 @@
 using FluentValidation;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NodePilot.Application.AdBlocking.Settings;
 using NodePilot.Application.Files.Settings;
+using NodePilot.Application.Interfaces.Accounts;
 using NodePilot.Application.Interfaces.AdBlocking;
+using NodePilot.Application.Interfaces.Security;
+using NodePilot.Application.Interfaces.Settings;
 using NodePilot.Application.Interfaces.Common;
 using NodePilot.Application.Interfaces.Monitoring;
 using NodePilot.Application.Monitoring.Models;
@@ -16,6 +20,7 @@ using NodePilot.Infrastructure.Configuration;
 using NodePilot.Infrastructure.Configuration.Monitoring;
 using NodePilot.Infrastructure.Persistence;
 using NodePilot.Infrastructure.Persistence.Repositories;
+using NodePilot.Infrastructure.Security;
 
 namespace NodePilot.Infrastructure;
 
@@ -30,7 +35,19 @@ public static class DependencyInjection
         services.AddDbContext<NodePilotDbContext>(options => options.UseSqlite(connectionString));
 
         services.AddScoped<ISystemMetricsRepository, SystemMetricsRepository>();
+        services.AddScoped<IUserAccountRepository, UserAccountRepository>();
+        services.AddScoped<IAppSettingsRepository, AppSettingsRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        // Security: password hashing and encryption of stored secrets. The Data Protection
+        // key ring lives next to the database, so it survives restarts and container rebuilds.
+        services.AddSingleton<IPasswordHasher, IdentityPasswordHasher>();
+        services
+            .AddDataProtection()
+            .SetApplicationName("NodePilot")
+            .PersistKeysToFileSystem(new DirectoryInfo(
+                Path.Combine(DatabaseExtensions.ResolveDataDirectory(connectionString), "keys")));
+        services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
 
         // Background Services
         services.AddHostedService<MetricsSamplingBackgroundService>();
@@ -70,6 +87,7 @@ public static class DependencyInjection
                 "PiHole:RequestTimeoutSeconds must be between 1 and 60.")
             .ValidateOnStart();
 
+        services.AddScoped<IPiHoleSettingsStore, PiHoleSettingsStore>();
         services.AddSingleton<PiHoleSessionStore>();
         services.AddHttpClient<IAdBlockerService, PiHoleClient>((serviceProvider, client) =>
         {

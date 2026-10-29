@@ -1,18 +1,14 @@
 namespace NodePilot.Api.Auth;
 
 /// <summary>
-/// Credentials of the single NodePilot administrator. The password is expected to come
-/// from the environment (<c>Auth__Password</c>) and is never stored in appsettings.
+/// Session options. The administrator account itself is created in the app on first start
+/// and stored in the database, so no credentials are configured here.
 /// </summary>
 public sealed class AuthSettings
 {
     public const string SectionName = "Auth";
 
-    public const int MinimumPasswordLength = 8;
+    public int SessionLifetimeHours { get; init; } = 168;
 
-    public string Username { get; init; } = string.Empty;
-
-    public string Password { get; init; } = string.Empty;
-
-    public int SessionLifetimeHours { get; init; }
+    public int LoginAttemptsPerMinute { get; init; } = 5;
 }

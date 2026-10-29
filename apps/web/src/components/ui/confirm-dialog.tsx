@@ -17,14 +17,17 @@ type ConfirmDialogProps = {
 export function ConfirmDialog({ open, title, description, confirmLabel, isPending, onConfirm, onCancel }: ConfirmDialogProps) {
 	return (
 		<Modal open={open} onClose={onCancel} className="max-w-md p-6" labelledBy="confirm-title">
-			<div className="grid size-12 place-items-center rounded-2xl border border-rose-300/20 bg-rose-500/10 text-rose-300 shadow-[0_0_30px_-8px_rgba(244,63,94,0.8)]">
-				<TriangleAlert className="size-5" />
+			<div className="flex items-center gap-3">
+				<span className="grid size-11 place-items-center border-2 border-ink bg-alert text-ink">
+					<TriangleAlert className="size-5" />
+				</span>
+				<span className="label text-muted">Confirm action</span>
 			</div>
-			<h2 id="confirm-title" className="mt-4 text-lg font-semibold text-white">
+			<h2 id="confirm-title" className="mt-4 pr-8 text-xl font-bold leading-tight text-ink">
 				{title}
 			</h2>
-			<div className="mt-1.5 text-sm leading-6 text-muted">{description}</div>
-			<div className="mt-6 flex justify-end gap-2">
+			<div className="mt-2 font-mono text-sm leading-6 text-muted">{description}</div>
+			<div className="mt-6 flex justify-end gap-3">
 				<Button variant="ghost" onClick={onCancel}>
 					Cancel
 				</Button>

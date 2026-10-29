@@ -1,8 +1,9 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { CircleCheck, Info, TriangleAlert, X } from "lucide-react";
+import { X } from "lucide-react";
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { cn } from "@/lib/cn";
 
 type ToastTone = "success" | "error" | "info";
 
@@ -19,10 +20,16 @@ type ToastContextValue = {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
-const toneStyles: Record<ToastTone, { icon: React.ReactNode; ring: string }> = {
-	success: { icon: <CircleCheck className="size-5 text-emerald-300" />, ring: "border-emerald-300/20" },
-	error: { icon: <TriangleAlert className="size-5 text-rose-300" />, ring: "border-rose-300/25" },
-	info: { icon: <Info className="size-5 text-sky-300" />, ring: "border-sky-300/20" },
+const LED: Record<ToastTone, string> = {
+	success: "bg-ok",
+	error: "bg-alert animate-blink",
+	info: "bg-accent",
+};
+
+const LABEL: Record<ToastTone, string> = {
+	success: "OK",
+	error: "FAULT",
+	info: "INFO",
 };
 
 let nextId = 1;
@@ -48,32 +55,26 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 	return (
 		<ToastContext.Provider value={value}>
 			{children}
-			<div className="pointer-events-none fixed inset-x-0 bottom-24 z-[100] flex flex-col items-center gap-2 px-4 lg:bottom-6 lg:items-end lg:px-6">
+			<div className="pointer-events-none fixed inset-x-0 bottom-24 z-[100] flex flex-col items-center gap-3 px-4 lg:bottom-6 lg:items-end lg:px-6">
 				<AnimatePresence initial={false}>
 					{toasts.map((item) => (
 						<motion.div
 							key={item.id}
 							layout
-							initial={{ opacity: 0, y: 24, scale: 0.92, filter: "blur(6px)" }}
-							animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-							exit={{ opacity: 0, x: 40, scale: 0.95, filter: "blur(6px)" }}
-							transition={{ type: "spring", stiffness: 420, damping: 32 }}
-							className={`glass pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl border p-4 ${toneStyles[item.tone].ring}`}
+							initial={{ opacity: 0, x: 60 }}
+							animate={{ opacity: 1, x: 0 }}
+							exit={{ opacity: 0, x: 60 }}
+							transition={{ type: "spring", stiffness: 600, damping: 38 }}
+							className="panel-sm pointer-events-auto flex w-full max-w-sm items-start gap-3 p-3"
 							role="status"
 						>
-							{toneStyles[item.tone].icon}
+							<span className={cn("led mt-1", LED[item.tone])} />
 							<div className="min-w-0 flex-1">
-								<p className="text-sm font-medium text-white">{item.title}</p>
-								{item.description ? (
-									<p className="mt-0.5 text-xs leading-5 text-muted">{item.description}</p>
-								) : null}
+								<p className="label text-muted">{LABEL[item.tone]}</p>
+								<p className="text-sm font-bold text-ink">{item.title}</p>
+								{item.description ? <p className="mt-0.5 font-mono text-xs leading-5 text-muted">{item.description}</p> : null}
 							</div>
-							<button
-								type="button"
-								onClick={() => dismiss(item.id)}
-								className="text-slate-500 transition hover:text-white"
-								aria-label="Dismiss notification"
-							>
+							<button type="button" onClick={() => dismiss(item.id)} className="grid size-7 place-items-center text-ink hover:bg-accent" aria-label="Dismiss notification">
 								<X className="size-4" />
 							</button>
 						</motion.div>

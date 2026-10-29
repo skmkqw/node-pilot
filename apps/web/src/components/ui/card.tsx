@@ -1,32 +1,17 @@
 "use client";
 
 import { motion, type HTMLMotionProps } from "motion/react";
-import { useCallback } from "react";
 import { cn } from "@/lib/cn";
 
 type CardProps = HTMLMotionProps<"div"> & {
-	/** Colour of the cursor-following highlight. */
-	glow?: string;
+	/** Highlighted plate (accent background), e.g. for a warning. */
+	tone?: "default" | "accent";
 };
 
-export function Card({ className, glow = "#ffffff", style, onMouseMove, children, ...props }: CardProps) {
-	const handleMouseMove = useCallback(
-		(event: React.MouseEvent<HTMLDivElement>) => {
-			const rect = event.currentTarget.getBoundingClientRect();
-			event.currentTarget.style.setProperty("--spot-x", `${event.clientX - rect.left}px`);
-			event.currentTarget.style.setProperty("--spot-y", `${event.clientY - rect.top}px`);
-			onMouseMove?.(event);
-		},
-		[onMouseMove],
-	);
-
+/** A bordered plate with a hard offset shadow — the basic unit of the hardware-panel look. */
+export function Card({ className, tone = "default", children, ...props }: CardProps) {
 	return (
-		<motion.div
-			className={cn("glass spotlight overflow-hidden rounded-3xl", className)}
-			style={{ ...style, ["--spot-color" as string]: glow }}
-			onMouseMove={handleMouseMove}
-			{...props}
-		>
+		<motion.div className={cn("panel", tone === "accent" && "bg-accent", className)} {...props}>
 			{children}
 		</motion.div>
 	);
@@ -37,34 +22,25 @@ export function CardHeader({
 	title,
 	subtitle,
 	action,
-	accent,
+	channel,
 }: {
 	icon?: React.ReactNode;
 	title: string;
 	subtitle?: React.ReactNode;
 	action?: React.ReactNode;
-	accent?: string;
+	/** Small stencil label above the title, e.g. "CH-E". */
+	channel?: string;
 }) {
 	return (
 		<div className="flex items-start justify-between gap-4">
 			<div className="flex min-w-0 items-center gap-3">
 				{icon ? (
-					<div
-						className="grid size-10 shrink-0 place-items-center rounded-2xl border border-white/10"
-						style={{
-							color: accent,
-							background: accent
-								? `linear-gradient(135deg, color-mix(in oklab, ${accent} 22%, transparent), color-mix(in oklab, ${accent} 4%, transparent))`
-								: undefined,
-							boxShadow: accent ? `0 0 24px -6px ${accent}` : undefined,
-						}}
-					>
-						{icon}
-					</div>
+					<div className="grid size-10 shrink-0 place-items-center border-2 border-ink bg-accent text-ink">{icon}</div>
 				) : null}
 				<div className="min-w-0">
-					<h3 className="truncate text-sm font-semibold tracking-tight text-white">{title}</h3>
-					{subtitle ? <p className="truncate text-xs text-muted">{subtitle}</p> : null}
+					{channel ? <p className="label text-muted">{channel}</p> : null}
+					<h3 className="truncate text-lg font-bold uppercase leading-tight tracking-tight text-ink">{title}</h3>
+					{subtitle ? <p className="truncate font-mono text-xs text-muted">{subtitle}</p> : null}
 				</div>
 			</div>
 			{action}

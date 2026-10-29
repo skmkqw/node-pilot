@@ -17,7 +17,44 @@ namespace NodePilot.Infrastructure.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.6");
 
-            modelBuilder.Entity("NodePilot.Application.Monitoring.SystemMetric", b =>
+            modelBuilder.Entity("NodePilot.Application.Accounts.Models.UserAccount", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime>("PasswordChangedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("password_changed_at_utc");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("password_hash");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("username")
+                        .UseCollation("NOCASE");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Username")
+                        .IsUnique()
+                        .HasDatabaseName("ux_users_username");
+
+                    b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("NodePilot.Application.Monitoring.Models.SystemMetric", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -89,6 +126,28 @@ namespace NodePilot.Infrastructure.Migrations
 
                             t.HasCheckConstraint("ck_system_metrics_total_reads_matches_enabled_metrics", "total_reads = (CASE WHEN cpu_enabled THEN 1 ELSE 0 END) + (CASE WHEN ram_enabled THEN 1 ELSE 0 END)");
                         });
+                });
+
+            modelBuilder.Entity("NodePilot.Application.Settings.Models.AppSetting", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("key");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("value");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("app_settings", (string)null);
                 });
 #pragma warning restore 612, 618
         }

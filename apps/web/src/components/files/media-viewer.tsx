@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { buttonStyles } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { filesApi } from "@/lib/api/endpoints";
 import type { FileEntry } from "@/lib/api/types";
@@ -27,7 +27,6 @@ export function MediaViewer({ items, index, onIndexChange }: MediaViewerProps) {
 	}
 
 	const item = current ?? lastItem;
-
 	const close = useCallback(() => onIndexChange(null), [onIndexChange]);
 
 	const step = useCallback(
@@ -52,17 +51,22 @@ export function MediaViewer({ items, index, onIndexChange }: MediaViewerProps) {
 	}, [index, step]);
 
 	return (
-		<Modal open={current !== null} onClose={close} className="max-w-5xl overflow-hidden" labelledBy="media-viewer-title">
+		<Modal open={current !== null} onClose={close} className="max-w-5xl" labelledBy="media-viewer-title">
 			{item ? (
 				<div>
-					<div className="relative bg-black">
+					<div className="flex items-center gap-3 border-b-2 border-ink bg-accent px-4 py-3 pr-14">
+						<span className="led animate-blink bg-alert" />
+						<span className="label">Playback{items.length > 1 && index !== null ? ` · ${index + 1} / ${items.length}` : ""}</span>
+					</div>
+
+					<div className="relative border-b-2 border-ink bg-black">
 						<AnimatePresence mode="wait">
 							<motion.div
 								key={item.path}
-								initial={{ opacity: 0, scale: 0.98 }}
-								animate={{ opacity: 1, scale: 1 }}
-								exit={{ opacity: 0, scale: 0.98 }}
-								transition={{ duration: 0.25 }}
+								initial={{ opacity: 0 }}
+								animate={{ opacity: 1 }}
+								exit={{ opacity: 0 }}
+								transition={{ duration: 0.15 }}
 								className="grid min-h-[16rem] place-items-center"
 							>
 								<MediaContent item={item} />
@@ -77,23 +81,20 @@ export function MediaViewer({ items, index, onIndexChange }: MediaViewerProps) {
 						) : null}
 					</div>
 
-					<div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+					<div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
 						<div className="flex min-w-0 items-center gap-3">
 							<FileIcon kind={item.kind} />
 							<div className="min-w-0">
-								<h2 id="media-viewer-title" className="truncate font-medium text-white">
+								<h2 id="media-viewer-title" className="truncate font-bold">
 									{item.name}
 								</h2>
-								<p className="text-xs text-muted">
+								<p className="font-mono text-xs text-muted">
 									{formatBytes(item.sizeBytes)} · {formatDateTime(item.modifiedAtUtc)}
-									{items.length > 1 && index !== null ? ` · ${index + 1} of ${items.length}` : ""}
 								</p>
 							</div>
 						</div>
-						<a href={filesApi.contentUrl(item.path, true)} download>
-							<Button variant="secondary" size="md">
-								<Download className="size-4" /> Download
-							</Button>
+						<a href={filesApi.contentUrl(item.path, true)} download className={buttonStyles("primary", "md")}>
+							<Download className="size-4" /> Download
 						</a>
 					</div>
 				</div>
@@ -107,38 +108,28 @@ function MediaContent({ item }: { item: FileEntry }) {
 
 	if (item.kind === "Image") {
 		// eslint-disable-next-line @next/next/no-img-element
-		return <img src={src} alt={item.name} className="max-h-[72vh] w-auto object-contain" />;
+		return <img src={src} alt={item.name} className="max-h-[70vh] w-auto object-contain" />;
 	}
 
 	if (item.kind === "Audio") {
 		return (
-			<div className="flex w-full flex-col items-center gap-8 px-6 py-14">
-				<div className="relative grid size-28 place-items-center">
-					{[0, 1, 2].map((ring) => (
+			<div className="flex w-full flex-col items-center gap-8 bg-ground px-6 py-14">
+				<div className="flex h-16 items-end gap-1.5" aria-hidden>
+					{Array.from({ length: 12 }).map((_, bar) => (
 						<motion.span
-							key={ring}
-							className="absolute inset-0 rounded-full border border-violet-300/30"
-							animate={{ scale: [1, 1.8], opacity: [0.6, 0] }}
-							transition={{ duration: 2.4, repeat: Infinity, delay: ring * 0.8, ease: "easeOut" }}
+							key={bar}
+							className="w-3 border-2 border-ink bg-accent"
+							animate={{ height: ["20%", "100%", "35%", "80%", "20%"] }}
+							transition={{ duration: 1.2 + (bar % 4) * 0.15, repeat: Infinity, delay: bar * 0.06, ease: "linear" }}
 						/>
 					))}
-					<FileIcon kind="Audio" size="lg" />
 				</div>
 				<audio src={src} controls autoPlay className="w-full max-w-md" />
 			</div>
 		);
 	}
 
-	return (
-		<video
-			key={src}
-			src={src}
-			controls
-			autoPlay
-			playsInline
-			className="max-h-[72vh] w-full bg-black"
-		/>
-	);
+	return <video key={src} src={src} controls autoPlay playsInline className="max-h-[70vh] w-full bg-black" />;
 }
 
 function NavButton({ side, onClick }: { side: "left" | "right"; onClick: () => void }) {
@@ -149,7 +140,7 @@ function NavButton({ side, onClick }: { side: "left" | "right"; onClick: () => v
 			type="button"
 			onClick={onClick}
 			aria-label={side === "left" ? "Previous" : "Next"}
-			className={`absolute top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-white/10 bg-black/50 text-white backdrop-blur transition hover:scale-110 hover:bg-black/70 ${side === "left" ? "left-3" : "right-3"}`}
+			className={`absolute top-1/2 grid size-11 -translate-y-1/2 place-items-center border-2 border-ink bg-accent shadow-[3px_3px_0_var(--ink)] transition active:shadow-none ${side === "left" ? "left-3" : "right-3"}`}
 		>
 			<Icon className="size-5" />
 		</button>

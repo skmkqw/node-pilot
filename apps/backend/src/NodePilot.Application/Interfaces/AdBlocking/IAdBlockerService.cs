@@ -1,5 +1,6 @@
 using ErrorOr;
 using NodePilot.Application.AdBlocking.Models;
+using NodePilot.Application.AdBlocking.Settings;
 
 namespace NodePilot.Application.Interfaces.AdBlocking;
 
@@ -13,4 +14,9 @@ public interface IAdBlockerService
         bool enabled,
         int? durationSeconds,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Checks the given (not yet saved) connection settings with a throwaway session.
+    /// </summary>
+    Task<AdBlockerStatus> TestConnectionAsync(PiHoleSettings candidate, CancellationToken ct = default);
 }

@@ -1,19 +1,21 @@
 "use client";
 
 import { AnimatePresence, motion, useAnimationControls } from "motion/react";
-import { Activity, ArrowRight, Eye, EyeOff, FolderOpen, Lock, ShieldCheck, TriangleAlert, User } from "lucide-react";
+import { Activity, ArrowRight, FolderOpen, Lock, ShieldCheck, User } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
+import { OfflineScreen } from "@/components/shell/offline-screen";
 import { Splash } from "@/components/shell/splash";
 import { Button } from "@/components/ui/button";
+import { Field, PasswordField, inputClassName } from "@/components/ui/field";
 import { Logo } from "@/components/ui/logo";
 import { Switch } from "@/components/ui/switch";
 
 const FEATURES = [
-	{ icon: Activity, title: "Live monitoring", text: "CPU, memory, temperature and disk at a glance.", color: "#22d3ee" },
-	{ icon: FolderOpen, title: "Files & media", text: "Browse, upload and stream videos in the browser.", color: "#a78bfa" },
-	{ icon: ShieldCheck, title: "Ad blocking", text: "Switch network-wide Pi-hole filtering in one tap.", color: "#34d399" },
+	{ icon: Activity, channel: "CH-A–E", title: "Live monitoring", text: "CPU, memory, temperature and disk at a glance." },
+	{ icon: FolderOpen, channel: "CH-H", title: "Files & media", text: "Browse, upload and stream videos in the browser." },
+	{ icon: ShieldCheck, channel: "CH-F", title: "Ad blocking", text: "Switch network-wide Pi-hole filtering in one tap." },
 ];
 
 export default function LoginPage() {
@@ -30,7 +32,7 @@ function safeNextPath(value: string | null) {
 }
 
 function LoginScreen() {
-	const { status, login } = useAuth();
+	const { status, login, retry } = useAuth();
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const next = safeNextPath(searchParams.get("next"));
@@ -38,7 +40,6 @@ function LoginScreen() {
 	const [username, setUsername] = useState("admin");
 	const [password, setPassword] = useState("");
 	const [rememberMe, setRememberMe] = useState(true);
-	const [showPassword, setShowPassword] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const shake = useAnimationControls();
@@ -46,6 +47,8 @@ function LoginScreen() {
 	useEffect(() => {
 		if (status === "authenticated") {
 			router.replace(next);
+		} else if (status === "setup") {
+			router.replace("/setup");
 		}
 	}, [status, router, next]);
 
@@ -58,198 +61,130 @@ function LoginScreen() {
 			await login(username.trim(), password, rememberMe);
 		} catch (caught) {
 			setError(caught instanceof Error ? caught.message : "Sign in failed.");
-			void shake.start({ x: [0, -10, 10, -7, 7, -3, 3, 0], transition: { duration: 0.5 } });
+			void shake.start({ x: [0, -10, 10, -7, 7, -3, 3, 0], transition: { duration: 0.4 } });
 		} finally {
 			setIsSubmitting(false);
 		}
 	};
 
-	if (status === "loading") {
+	if (status === "offline") {
+		return <OfflineScreen onRetry={retry} />;
+	}
+
+	if (status !== "anonymous") {
 		return <Splash />;
 	}
 
 	return (
-		<div className="grid min-h-screen items-center px-4 py-10 lg:grid-cols-[1.1fr_1fr] lg:px-16">
+		<div className="grid min-h-screen items-center gap-12 px-4 py-10 lg:grid-cols-[1.1fr_1fr] lg:px-16">
 			{/* Brand column */}
 			<motion.section
 				initial="hidden"
 				animate="show"
-				variants={{ show: { transition: { staggerChildren: 0.09, delayChildren: 0.15 } } }}
+				variants={{ show: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } } }}
 				className="hidden max-w-xl lg:block"
 			>
-				<motion.div
-					variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
-					className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/5 px-3 py-1.5 text-xs font-medium text-cyan-200"
-				>
-					<span className="size-1.5 rounded-full bg-cyan-300 shadow-[0_0_8px_2px_rgba(103,232,249,0.7)]" />
+				<motion.div variants={{ hidden: { opacity: 0, x: -12 }, show: { opacity: 1, x: 0 } }} className="label inline-flex items-center gap-2 border-2 border-ink bg-surface px-3 py-1.5">
+					<span className="led size-2.5 animate-blink border-[1.5px] bg-ok" />
 					Self-hosted · Private · Lightweight
 				</motion.div>
 				<motion.h1
 					variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }}
-					className="mt-6 text-5xl font-semibold leading-[1.05] tracking-tight text-white xl:text-6xl"
+					className="mt-6 text-6xl font-bold leading-[0.95] tracking-tight xl:text-7xl"
 				>
 					Your home server,
 					<br />
-					<span className="bg-gradient-to-r from-cyan-300 via-sky-300 to-violet-300 bg-clip-text text-transparent">
-						beautifully simple.
-					</span>
+					<span className="bg-ink px-2 text-accent">one panel.</span>
 				</motion.h1>
-				<motion.p
-					variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }}
-					className="mt-5 max-w-md text-base leading-7 text-muted"
-				>
-					One place for everything your server does. No terminal, no ten different admin panels.
+				<motion.p variants={{ hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }} className="mt-6 max-w-md font-mono text-sm leading-6 text-muted">
+					Everything your server does, in one place. No terminal, no ten different admin panels.
 				</motion.p>
 
-				<div className="mt-10 grid gap-3">
+				<div className="mt-10 grid gap-4">
 					{FEATURES.map((feature) => (
-						<motion.div
-							key={feature.title}
-							variants={{ hidden: { opacity: 0, x: -16 }, show: { opacity: 1, x: 0 } }}
-							className="glass flex items-center gap-4 rounded-2xl p-4"
-						>
-							<div
-								className="grid size-11 place-items-center rounded-xl border border-white/10"
-								style={{ color: feature.color, background: `color-mix(in oklab, ${feature.color} 14%, transparent)` }}
-							>
+						<motion.div key={feature.title} variants={{ hidden: { opacity: 0, x: -20 }, show: { opacity: 1, x: 0 } }} className="panel-sm flex items-center gap-4 p-3">
+							<div className="grid size-11 shrink-0 place-items-center border-2 border-ink bg-accent">
 								<feature.icon className="size-5" />
 							</div>
 							<div>
-								<p className="text-sm font-medium text-white">{feature.title}</p>
-								<p className="text-xs text-muted">{feature.text}</p>
+								<p className="label text-muted">{feature.channel}</p>
+								<p className="font-bold uppercase leading-tight">{feature.title}</p>
+								<p className="font-mono text-xs text-muted">{feature.text}</p>
 							</div>
 						</motion.div>
 					))}
 				</div>
 			</motion.section>
 
-			{/* Sign-in card */}
+			{/* Sign-in panel */}
 			<motion.div
-				initial={{ opacity: 0, y: 24, scale: 0.97 }}
-				animate={{ opacity: 1, y: 0, scale: 1 }}
-				transition={{ type: "spring", stiffness: 200, damping: 26 }}
+				initial={{ opacity: 0, y: 24 }}
+				animate={{ opacity: 1, y: 0 }}
+				transition={{ type: "spring", stiffness: 380, damping: 32 }}
 				className="mx-auto w-full max-w-md"
 			>
-				<motion.form
-					animate={shake}
-					onSubmit={submit}
-					className="glass relative overflow-hidden rounded-[2rem] p-7 sm:p-9"
-				>
-					<div className="pointer-events-none absolute -top-24 left-1/2 h-48 w-72 -translate-x-1/2 rounded-full bg-cyan-400/20 blur-3xl" />
-
-					<div className="relative flex flex-col items-center text-center">
-						<div className="relative mb-5">
-							<motion.div
-								className="absolute -inset-4 rounded-full border border-dashed border-cyan-300/25"
-								animate={{ rotate: 360 }}
-								transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
-							/>
-							<motion.div
-								className="absolute -inset-8 rounded-full border border-violet-300/10"
-								animate={{ rotate: -360 }}
-								transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-							/>
-							<Logo size={60} />
-						</div>
-						<h2 className="text-2xl font-semibold tracking-tight text-white">Welcome back</h2>
-						<p className="mt-1.5 text-sm text-muted">Sign in to your NodePilot control panel</p>
+				<motion.form animate={shake} onSubmit={submit} className="panel">
+					<div className="flex items-center justify-between border-b-2 border-ink bg-accent px-5 py-3">
+						<span className="label">Access panel · Unit 01</span>
+						<span className="led bg-ok" />
 					</div>
 
-					<div className="relative mt-8 space-y-4">
-						<Field icon={<User className="size-4" />} label="Username">
-							<input
-								value={username}
-								onChange={(event) => setUsername(event.target.value)}
-								autoComplete="username"
-								required
-								className="h-12 w-full bg-transparent pr-4 text-sm text-white outline-none placeholder:text-slate-500"
-								placeholder="admin"
-							/>
-						</Field>
+					<div className="p-6 sm:p-8">
+						<div className="flex items-center gap-4">
+							<Logo size={56} />
+							<div>
+								<h2 className="text-2xl font-bold uppercase leading-tight">Welcome back</h2>
+								<p className="font-mono text-xs text-muted">Sign in to your NodePilot control panel</p>
+							</div>
+						</div>
 
-						<Field
-							icon={<Lock className="size-4" />}
-							label="Password"
-							trailing={
-								<button
-									type="button"
-									onClick={() => setShowPassword((value) => !value)}
-									className="grid size-9 place-items-center rounded-lg text-slate-400 transition hover:text-white"
-									aria-label={showPassword ? "Hide password" : "Show password"}
-								>
-									{showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-								</button>
-							}
-						>
-							<input
-								type={showPassword ? "text" : "password"}
+						<div className="mt-8 space-y-5">
+							<Field icon={<User className="size-4" />} label="Username">
+								<input
+									value={username}
+									onChange={(event) => setUsername(event.target.value)}
+									autoComplete="username"
+									required
+									className={inputClassName}
+									placeholder="admin"
+								/>
+							</Field>
+
+							<PasswordField
+								icon={<Lock className="size-4" />}
+								label="Password"
 								value={password}
 								onChange={(event) => setPassword(event.target.value)}
 								autoComplete="current-password"
 								required
 								autoFocus
-								className="h-12 w-full bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
 								placeholder="••••••••"
 							/>
-						</Field>
 
-						<label className="flex cursor-pointer items-center justify-between rounded-2xl px-1 py-1 text-sm text-slate-300">
-							Keep me signed in
-							<Switch checked={rememberMe} onChange={setRememberMe} label="Keep me signed in" />
-						</label>
+							<label className="flex cursor-pointer items-center justify-between gap-4">
+								<span className="label">Keep me signed in</span>
+								<Switch checked={rememberMe} onChange={setRememberMe} label="Keep me signed in" />
+							</label>
 
-						<AnimatePresence>
-							{error ? (
-								<motion.div
-									initial={{ opacity: 0, height: 0 }}
-									animate={{ opacity: 1, height: "auto" }}
-									exit={{ opacity: 0, height: 0 }}
-									className="overflow-hidden"
-								>
-									<div className="flex items-center gap-2 rounded-2xl border border-rose-300/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-										<TriangleAlert className="size-4 shrink-0" />
-										{error}
-									</div>
-								</motion.div>
-							) : null}
-						</AnimatePresence>
+							<AnimatePresence>
+								{error ? (
+									<motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+										<div className="flex items-center gap-3 border-2 border-ink bg-alert px-3 py-2.5 font-mono text-sm font-bold">
+											<span className="led animate-blink bg-surface" />
+											{error}
+										</div>
+									</motion.div>
+								) : null}
+							</AnimatePresence>
 
-						<Button type="submit" variant="primary" size="lg" isLoading={isSubmitting} className="group w-full">
-							{isSubmitting ? "Signing in…" : "Sign in"}
-							{!isSubmitting ? (
-								<ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />
-							) : null}
-						</Button>
+							<Button type="submit" variant="primary" size="lg" isLoading={isSubmitting} className="group w-full">
+								{isSubmitting ? "Signing in…" : "Sign in"}
+								{!isSubmitting ? <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" /> : null}
+							</Button>
+						</div>
 					</div>
 				</motion.form>
-
-				<p className="mt-6 text-center text-xs text-slate-500">
-					Credentials are configured on the server (<code className="text-slate-400">Auth__Password</code>).
-				</p>
 			</motion.div>
 		</div>
-	);
-}
-
-function Field({
-	icon,
-	label,
-	trailing,
-	children,
-}: {
-	icon: React.ReactNode;
-	label: string;
-	trailing?: React.ReactNode;
-	children: React.ReactNode;
-}) {
-	return (
-		<label className="block">
-			<span className="mb-1.5 block text-xs font-medium text-slate-400">{label}</span>
-			<span className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] pl-4 pr-1.5 text-slate-500 transition focus-within:border-cyan-300/50 focus-within:bg-white/[0.06] focus-within:text-cyan-300 focus-within:shadow-[0_0_0_4px_rgba(34,211,238,0.12)]">
-				{icon}
-				{children}
-				{trailing}
-			</span>
-		</label>
 	);
 }

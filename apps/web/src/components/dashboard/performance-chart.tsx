@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { Activity } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
 import { systemApi } from "@/lib/api/endpoints";
@@ -20,13 +20,13 @@ const RANGES: Record<RangeKey, { label: string; windowMs: number; intervalSecond
 	"24h": { label: "24h", windowMs: 24 * 60 * 60_000, intervalSeconds: 900 },
 };
 
-const METRICS: Record<MetricKey, { label: string; color: string; colorTo: string }> = {
-	cpu: { label: "CPU", color: "#22d3ee", colorTo: "#38bdf8" },
-	ram: { label: "Memory", color: "#a78bfa", colorTo: "#c084fc" },
-};
+const METRIC_OPTIONS = [
+	{ value: "cpu", label: "CPU" },
+	{ value: "ram", label: "RAM" },
+] as const;
 
 const HEIGHT = 260;
-const PADDING = { top: 16, right: 40, bottom: 28, left: 8 };
+const PADDING = { top: 14, right: 44, bottom: 28, left: 4 };
 
 type Point = {
 	time: number;
@@ -74,38 +74,12 @@ function segments(points: Point[]) {
 	return result;
 }
 
-/** Smooth line through points using a monotone-ish cubic (Catmull-Rom → Bézier). */
-function smoothPath(coords: Array<[number, number]>) {
-	if (coords.length === 0) return "";
-	if (coords.length === 1) return `M ${coords[0][0]} ${coords[0][1]} h 0.01`;
-
-	let d = `M ${coords[0][0]} ${coords[0][1]}`;
-
-	for (let index = 0; index < coords.length - 1; index++) {
-		const [x0, y0] = coords[index - 1] ?? coords[index];
-		const [x1, y1] = coords[index];
-		const [x2, y2] = coords[index + 1];
-		const [x3, y3] = coords[index + 2] ?? coords[index + 1];
-		const tension = 0.18;
-
-		const c1x = x1 + (x2 - x0) * tension;
-		const c1y = y1 + (y2 - y0) * tension;
-		const c2x = x2 - (x3 - x1) * tension;
-		const c2y = y2 - (y3 - y1) * tension;
-
-		d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${x2} ${y2}`;
-	}
-
-	return d;
-}
-
 export function PerformanceChart() {
 	const [metric, setMetric] = useState<MetricKey>("cpu");
 	const [range, setRange] = useState<RangeKey>("1h");
 	const [width, setWidth] = useState(640);
 	const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
-	const gradientId = useId();
 
 	const config = RANGES[range];
 	const intervalMs = config.intervalSeconds * 1000;
@@ -146,7 +120,6 @@ export function PerformanceChart() {
 
 	const pointIndex = new Map(points.map((point, index) => [point, index]));
 	const lineSegments = segments(points);
-	const colors = METRICS[metric];
 
 	const measured = points.filter((point) => point.avg !== null);
 	const average = measured.length ? measured.reduce((sum, point) => sum + point.avg!, 0) / measured.length : null;
@@ -163,52 +136,44 @@ export function PerformanceChart() {
 	const hovered = hoverIndex !== null ? points[hoverIndex] : null;
 	const drawKey = `${metric}-${range}`;
 	const timeTicks = points.length ? [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(f * (points.length - 1))) : [];
+	const label = metric === "cpu" ? "CPU" : "Memory";
+
+	const controls = (size: "sm" | "md") => (
+		<>
+			<Segmented label="Metric" size={size} value={metric} onChange={setMetric} options={METRIC_OPTIONS} />
+			<Segmented
+				label="Time range"
+				size={size}
+				value={range}
+				onChange={setRange}
+				options={(Object.keys(RANGES) as RangeKey[]).map((key) => ({ value: key, label: RANGES[key].label }))}
+			/>
+		</>
+	);
 
 	return (
-		<Card glow={colors.color} className="flex h-full flex-col p-5 sm:p-6">
+		<Card className="flex h-full flex-col p-5 sm:p-6">
 			<CardHeader
 				icon={<Activity className="size-5" />}
-				accent={colors.color}
+				channel="CH-E / History"
 				title="Performance"
 				subtitle={
 					average !== null ? (
 						<span className="tabular">
-							avg <span className="text-slate-200">{average.toFixed(1)}%</span> · peak{" "}
-							<span className="text-slate-200">{peak!.toFixed(1)}%</span> · last {config.label}
+							AVG {average.toFixed(1)}% · PEAK {peak!.toFixed(1)}% · LAST {config.label.toUpperCase()}
 						</span>
 					) : (
-						`Last ${config.label}`
+						`LAST ${config.label.toUpperCase()}`
 					)
 				}
-				action={
-					<div className="hidden flex-wrap justify-end gap-2 sm:flex">
-						<Segmented
-							label="Metric"
-							value={metric}
-							onChange={setMetric}
-							options={[
-								{ value: "cpu", label: "CPU" },
-								{ value: "ram", label: "Memory" },
-							]}
-						/>
-						<Segmented
-							label="Time range"
-							value={range}
-							onChange={setRange}
-							options={(Object.keys(RANGES) as RangeKey[]).map((key) => ({ value: key, label: RANGES[key].label }))}
-						/>
-					</div>
-				}
+				action={<div className="hidden flex-wrap justify-end gap-2 sm:flex">{controls("md")}</div>}
 			/>
 
-			<div className="mt-4 flex flex-wrap gap-2 sm:hidden">
-				<Segmented label="Metric" size="sm" value={metric} onChange={setMetric} options={[{ value: "cpu", label: "CPU" }, { value: "ram", label: "Memory" }]} />
-				<Segmented label="Time range" size="sm" value={range} onChange={setRange} options={(Object.keys(RANGES) as RangeKey[]).map((key) => ({ value: key, label: RANGES[key].label }))} />
-			</div>
+			<div className="mt-4 flex flex-wrap gap-2 sm:hidden">{controls("sm")}</div>
 
-			<div ref={containerRef} className="relative mt-5 flex-1" style={{ minHeight: HEIGHT }}>
+			<div ref={containerRef} className="relative mt-5 flex-1 border-2 border-ink bg-ground/40" style={{ minHeight: HEIGHT }}>
 				{history.isLoading && !history.data ? (
-					<div className="skeleton absolute inset-0 rounded-2xl" />
+					<div className="skeleton absolute inset-0 border-0" />
 				) : (
 					<svg
 						width={width}
@@ -217,26 +182,8 @@ export function PerformanceChart() {
 						onPointerMove={handlePointer}
 						onPointerLeave={() => setHoverIndex(null)}
 						role="img"
-						aria-label={`${colors.label} usage over the last ${config.label}`}
+						aria-label={`${label} usage over the last ${config.label}`}
 					>
-						<defs>
-							<linearGradient id={`${gradientId}-area`} x1="0" x2="0" y1="0" y2="1">
-								<stop offset="0%" stopColor={colors.color} stopOpacity="0.35" />
-								<stop offset="100%" stopColor={colors.color} stopOpacity="0" />
-							</linearGradient>
-							<linearGradient id={`${gradientId}-line`} x1="0" x2="1" y1="0" y2="0">
-								<stop offset="0%" stopColor={colors.color} />
-								<stop offset="100%" stopColor={colors.colorTo} />
-							</linearGradient>
-							<filter id={`${gradientId}-glow`} x="-10%" y="-30%" width="120%" height="160%">
-								<feGaussianBlur stdDeviation="5" result="blur" />
-								<feMerge>
-									<feMergeNode in="blur" />
-									<feMergeNode in="SourceGraphic" />
-								</feMerge>
-							</filter>
-						</defs>
-
 						{[0, 25, 50, 75, 100].map((tick) => (
 							<g key={tick}>
 								<line
@@ -244,10 +191,12 @@ export function PerformanceChart() {
 									x2={PADDING.left + innerWidth}
 									y1={y(tick)}
 									y2={y(tick)}
-									stroke="rgba(148,163,184,0.1)"
-									strokeDasharray={tick === 0 ? undefined : "3 6"}
+									stroke="var(--ink)"
+									strokeOpacity={tick === 0 ? 1 : 0.18}
+									strokeWidth={tick === 0 ? 2 : 1}
+									strokeDasharray={tick === 0 ? undefined : "2 6"}
 								/>
-								<text x={PADDING.left + innerWidth + 8} y={y(tick) + 4} fontSize="10" fill="rgba(148,163,184,0.6)" className="tabular">
+								<text x={PADDING.left + innerWidth + 8} y={y(tick) + 4} fontSize="11" fontFamily="var(--font-space-mono)" fill="var(--ink)" className="tabular">
 									{tick}%
 								</text>
 							</g>
@@ -257,9 +206,10 @@ export function PerformanceChart() {
 							<text
 								key={`${index}-${position}`}
 								x={x(index)}
-								y={HEIGHT - 6}
-								fontSize="10"
-								fill="rgba(148,163,184,0.6)"
+								y={HEIGHT - 8}
+								fontSize="11"
+								fontFamily="var(--font-space-mono)"
+								fill="var(--ink)"
 								textAnchor={position === 0 ? "start" : position === timeTicks.length - 1 ? "end" : "middle"}
 								className="tabular"
 							>
@@ -268,16 +218,14 @@ export function PerformanceChart() {
 						))}
 
 						<AnimatePresence mode="wait">
-							<motion.g key={drawKey} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+							<motion.g key={drawKey} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
 								{lineSegments.map((segment, segmentIndex) => {
 									const coords = segment.map((point) => [x(pointIndex.get(point)!), y(point.avg!)] as [number, number]);
-									const line = smoothPath(coords);
+									const line = coords.map(([px, py], i) => `${i === 0 ? "M" : "L"} ${px} ${py}`).join(" ");
 									const area = `${line} L ${coords[coords.length - 1][0]} ${y(0)} L ${coords[0][0]} ${y(0)} Z`;
 									const band =
-										segment.every((point) => point.min !== null && point.max !== null) && segment.length > 1
-											? `${segment
-													.map((point, i) => `${i === 0 ? "M" : "L"} ${x(pointIndex.get(point)!)} ${y(point.max!)}`)
-													.join(" ")} ${[...segment]
+										segment.length > 1 && segment.every((point) => point.min !== null && point.max !== null)
+											? `${segment.map((point, i) => `${i === 0 ? "M" : "L"} ${x(pointIndex.get(point)!)} ${y(point.max!)}`).join(" ")} ${[...segment]
 													.reverse()
 													.map((point) => `L ${x(pointIndex.get(point)!)} ${y(point.min!)}`)
 													.join(" ")} Z`
@@ -287,23 +235,21 @@ export function PerformanceChart() {
 										<g key={segmentIndex}>
 											<motion.path
 												d={area}
-												fill={`url(#${gradientId}-area)`}
+												fill="var(--accent)"
 												initial={{ opacity: 0 }}
 												animate={{ opacity: 1 }}
-												transition={{ duration: 0.8, delay: 0.3 }}
+												transition={{ duration: 0.4, delay: 0.5 }}
 											/>
-											{band ? <path d={band} fill={colors.color} fillOpacity="0.08" /> : null}
+											{band ? <path d={band} fill="var(--ink)" fillOpacity="0.12" /> : null}
 											<motion.path
 												d={line}
 												fill="none"
-												stroke={`url(#${gradientId}-line)`}
-												strokeWidth="2.5"
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												filter={`url(#${gradientId}-glow)`}
+												stroke="var(--ink)"
+												strokeWidth="3"
+												strokeLinejoin="miter"
 												initial={{ pathLength: 0 }}
 												animate={{ pathLength: 1 }}
-												transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
+												transition={{ duration: 0.9, ease: "linear" }}
 											/>
 										</g>
 									);
@@ -313,24 +259,9 @@ export function PerformanceChart() {
 
 						{hovered ? (
 							<g pointerEvents="none">
-								<line
-									x1={x(hoverIndex!)}
-									x2={x(hoverIndex!)}
-									y1={PADDING.top}
-									y2={y(0)}
-									stroke="rgba(226,232,240,0.25)"
-									strokeDasharray="3 4"
-								/>
+								<line x1={x(hoverIndex!)} x2={x(hoverIndex!)} y1={PADDING.top} y2={y(0)} stroke="var(--ink)" strokeWidth="1.5" strokeDasharray="4 4" />
 								{hovered.avg !== null ? (
-									<motion.circle
-										initial={{ r: 0 }}
-										animate={{ r: 5 }}
-										cx={x(hoverIndex!)}
-										cy={y(hovered.avg)}
-										fill="#fff"
-										stroke={colors.color}
-										strokeWidth="3"
-									/>
+									<rect x={x(hoverIndex!) - 6} y={y(hovered.avg) - 6} width="12" height="12" fill="var(--surface)" stroke="var(--ink)" strokeWidth="2.5" />
 								) : null}
 							</g>
 						) : null}
@@ -340,37 +271,33 @@ export function PerformanceChart() {
 				<AnimatePresence>
 					{hovered ? (
 						<motion.div
-							initial={{ opacity: 0, y: 6 }}
+							initial={{ opacity: 0, y: 4 }}
 							animate={{ opacity: 1, y: 0 }}
 							exit={{ opacity: 0 }}
-							transition={{ duration: 0.15 }}
-							className="glass pointer-events-none absolute top-0 z-10 w-48 rounded-2xl p-3 text-xs"
-							style={{
-								left: Math.min(Math.max(x(hoverIndex!) - 96, 0), Math.max(width - 192, 0)),
-							}}
+							transition={{ duration: 0.1 }}
+							className="panel-sm pointer-events-none absolute top-2 z-10 w-52 p-3"
+							style={{ left: Math.min(Math.max(x(hoverIndex!) - 104, 4), Math.max(width - 212, 4)) }}
 						>
-							<p className="text-[0.68rem] uppercase tracking-[0.16em] text-slate-400">{formatDateTime(new Date(hovered.time))}</p>
+							<p className="label text-muted">{formatDateTime(new Date(hovered.time))}</p>
 							{hovered.avg !== null ? (
 								<>
-									<p className="mt-1.5 text-lg font-semibold text-white tabular">
+									<p className="mt-1 text-2xl font-bold tabular">
 										{hovered.avg.toFixed(1)}
-										<span className="ml-0.5 text-xs text-slate-400">% avg</span>
+										<span className="ml-1 font-mono text-xs">% AVG</span>
 									</p>
-									<p className="mt-0.5 text-slate-400 tabular">
-										range {hovered.min?.toFixed(1)}–{hovered.max?.toFixed(1)}% · {hovered.summary?.totalSamples} samples
+									<p className="font-mono text-xs tabular">
+										{hovered.min?.toFixed(1)}–{hovered.max?.toFixed(1)}% · {hovered.summary?.totalSamples} SAMPLES
 									</p>
 								</>
 							) : (
-								<p className="mt-1.5 text-amber-200/90">No samples in this interval</p>
+								<p className="mt-1 font-mono text-xs font-bold">NO SAMPLES IN THIS INTERVAL</p>
 							)}
 						</motion.div>
 					) : null}
 				</AnimatePresence>
 
 				{history.data && measured.length === 0 ? (
-					<div className="absolute inset-0 grid place-items-center text-sm text-muted">
-						Collecting data — the chart fills in as samples arrive.
-					</div>
+					<div className="label absolute inset-0 grid place-items-center text-muted">Collecting data — the chart fills in as samples arrive</div>
 				) : null}
 			</div>
 		</Card>

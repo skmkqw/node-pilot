@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using Microsoft.Extensions.Options;
 
 namespace NodePilot.Api.Auth;
 
@@ -6,12 +7,11 @@ public static class RateLimitingExtensions
 {
     public const string LoginPolicy = "login";
 
-    private const int _loginAttemptsPerWindow = 5;
-
     private static readonly TimeSpan _loginWindow = TimeSpan.FromMinutes(1);
 
     /// <summary>
-    /// Limits login attempts per client IP to slow down password guessing.
+    /// Limits login and setup attempts per client IP to slow down password guessing
+    /// (<c>Auth:LoginAttemptsPerMinute</c>, default 5).
     /// </summary>
     public static IServiceCollection AddLoginRateLimiting(this IServiceCollection services)
     {
@@ -24,7 +24,8 @@ public static class RateLimitingExtensions
                     context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                     _ => new FixedWindowRateLimiterOptions
                     {
-                        PermitLimit = _loginAttemptsPerWindow,
+                        PermitLimit = context.RequestServices
+                            .GetRequiredService<IOptions<AuthSettings>>().Value.LoginAttemptsPerMinute,
                         Window = _loginWindow,
                         QueueLimit = 0,
                     }));

@@ -2,9 +2,11 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
+using ErrorOr;
+using NodePilot.Application.AdBlocking.Models;
 using NodePilot.Application.AdBlocking.Settings;
 using NodePilot.Application.Common;
+using NodePilot.Application.Interfaces.AdBlocking;
 using NodePilot.Infrastructure.AdBlocking;
 
 namespace NodePilot.Api.Tests.Unit;
@@ -102,30 +104,74 @@ public class PiHoleClientTests
         Assert.That(result.FirstError.Code, Is.EqualTo("AdBlocker.InvalidDuration"));
     }
 
-    private static PiHoleClient CreateClient(FakePiHole handler, string baseUrl = "http://pihole.test", string password = _password)
+    [Test]
+    public async Task TestConnection_UsesThrowawaySessionAndLogsOut()
     {
-        var settings = new PiHoleSettings { BaseUrl = baseUrl, Password = password, RequestTimeoutSeconds = 5 };
+        var handler = new FakePiHole();
+        var client = CreateClient(handler);
 
-        return new PiHoleClient(
-            new HttpClient(handler),
-            new StaticOptionsMonitor<PiHoleSettings>(settings),
-            new PiHoleSessionStore(),
-            NullLogger<PiHoleClient>.Instance);
+        await client.GetStatusAsync();
+        var tested = await client.TestConnectionAsync(Settings());
+        await client.GetStatusAsync();
+
+        Assert.That(tested.Reachable, Is.True);
+        Assert.That(handler.LoggedOut, Is.EqualTo(1), "the test session is closed");
+        Assert.That(handler.Requests.Count(request => request == "POST /api/auth"), Is.EqualTo(2), "cached session kept for status");
     }
 
-    private sealed class StaticOptionsMonitor<T>(T value) : IOptionsMonitor<T>
+    [Test]
+    public async Task TestConnection_WrongPassword_ReportsReason()
     {
-        public T CurrentValue => value;
+        var status = await CreateClient(new FakePiHole()).TestConnectionAsync(Settings(password: "nope"));
 
-        public T Get(string? name) => value;
+        Assert.That(status.Reachable, Is.False);
+        Assert.That(status.Message, Does.Contain("password"));
+    }
 
-        public IDisposable? OnChange(Action<T, string?> listener) => null;
+    [Test]
+    public async Task ChangedPassword_StartsNewSession()
+    {
+        var handler = new FakePiHole();
+        var store = new StaticSettingsStore(Settings(password: "outdated-password"));
+        var client = CreateClient(handler, store);
+
+        var before = await client.GetStatusAsync();
+        store.Current = Settings();
+        var after = await client.GetStatusAsync();
+
+        Assert.That(before.Reachable, Is.False);
+        Assert.That(after.Reachable, Is.True, "new credentials are used immediately");
+    }
+
+    private static PiHoleClient CreateClient(FakePiHole handler, string baseUrl = "http://pihole.test", string password = _password) =>
+        CreateClient(handler, new StaticSettingsStore(Settings(baseUrl, password)));
+
+    private static PiHoleClient CreateClient(FakePiHole handler, StaticSettingsStore store) =>
+        new(new HttpClient(handler), store, new PiHoleSessionStore(), NullLogger<PiHoleClient>.Instance);
+
+    private static PiHoleSettings Settings(string baseUrl = "http://pihole.test", string password = _password) =>
+        new() { BaseUrl = baseUrl, Password = password, RequestTimeoutSeconds = 5 };
+
+    private sealed class StaticSettingsStore(PiHoleSettings settings) : IPiHoleSettingsStore
+    {
+        public PiHoleSettings Current { get; set; } = settings;
+
+        public Task<PiHoleSettings> GetEffectiveAsync(CancellationToken ct = default) => Task.FromResult(Current);
+
+        public Task<PiHoleConnectionInfo> GetInfoAsync(CancellationToken ct = default) =>
+            Task.FromResult(new PiHoleConnectionInfo(Current.BaseUrl, Current.Password.Length > 0, PiHoleSettingsSource.App));
+
+        public Task<ErrorOr<PiHoleConnectionInfo>> SaveAsync(string? baseUrl, string? password, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task ClearAsync(CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     /// <summary>In-memory stand-in for the Pi-hole v6 REST API.</summary>
     private sealed class FakePiHole : HttpMessageHandler
     {
-        private string? _validSid;
+        // Pi-hole keeps several sessions at once; each login adds one, logout removes it.
+        private readonly HashSet<string> _validSids = [];
         private int _sessionCounter;
         private string _blocking = "enabled";
         private int? _timer;
@@ -134,7 +180,9 @@ public class PiHoleClientTests
 
         public List<string> Requests { get; } = [];
 
-        public void ExpireSession() => _validSid = null;
+        public int LoggedOut { get; private set; }
+
+        public void ExpireSession() => _validSids.Clear();
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -148,18 +196,30 @@ public class PiHoleClientTests
 
             string body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
 
+            if (path == "/api/auth" && request.Method == HttpMethod.Delete)
+            {
+                _validSids.Remove(request.Headers.GetValues("X-FTL-SID").Single());
+                LoggedOut++;
+                return new HttpResponseMessage(HttpStatusCode.NoContent);
+            }
+
             if (path == "/api/auth")
             {
                 bool valid = JsonDocument.Parse(body).RootElement.GetProperty("password").GetString() == _password;
-                _validSid = valid ? $"sid-{++_sessionCounter}" : null;
+                string? newSid = valid ? $"sid-{++_sessionCounter}" : null;
+
+                if (newSid is not null)
+                {
+                    _validSids.Add(newSid);
+                }
 
                 return Json(valid ? HttpStatusCode.OK : HttpStatusCode.Unauthorized, new
                 {
-                    session = new { valid, sid = _validSid, message = valid ? "success" : "password incorrect" },
+                    session = new { valid, sid = newSid, message = valid ? "success" : "password incorrect" },
                 });
             }
 
-            if (!request.Headers.TryGetValues("X-FTL-SID", out var sid) || sid.Single() != _validSid)
+            if (!request.Headers.TryGetValues("X-FTL-SID", out var sid) || !_validSids.Contains(sid.Single()))
             {
                 return Json(HttpStatusCode.Unauthorized, new { error = new { key = "unauthorized" } });
             }

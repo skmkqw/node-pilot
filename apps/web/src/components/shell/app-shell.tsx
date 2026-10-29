@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { FolderOpen, LayoutDashboard, LogOut } from "lucide-react";
+import { FolderOpen, LayoutDashboard, LogOut, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -9,8 +9,9 @@ import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/cn";
 
 const NAV_ITEMS = [
-	{ href: "/", label: "Dashboard", icon: LayoutDashboard },
-	{ href: "/files", label: "Files & Media", icon: FolderOpen },
+	{ href: "/", label: "Dashboard", code: "01", icon: LayoutDashboard },
+	{ href: "/files", label: "Files & Media", code: "02", icon: FolderOpen },
+	{ href: "/settings", label: "Settings", code: "03", icon: Settings },
 ] as const;
 
 function isActive(pathname: string, href: string) {
@@ -25,22 +26,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 		<div className="min-h-screen lg:pl-[18.5rem]">
 			{/* Desktop sidebar */}
 			<motion.aside
-				initial={{ x: -24, opacity: 0 }}
+				initial={{ x: -32, opacity: 0 }}
 				animate={{ x: 0, opacity: 1 }}
-				transition={{ type: "spring", stiffness: 260, damping: 30 }}
-				className="glass fixed inset-y-4 left-4 z-40 hidden w-64 flex-col rounded-[1.75rem] p-4 lg:flex"
+				transition={{ type: "spring", stiffness: 420, damping: 36 }}
+				className="panel fixed inset-y-5 left-5 z-40 hidden w-64 flex-col lg:flex"
 			>
-				<Link href="/" className="flex items-center gap-3 px-2 py-2">
-					<Logo size={38} />
+				<Link href="/" className="flex items-center gap-3 border-b-2 border-ink bg-accent px-4 py-4">
+					<Logo size={40} />
 					<div>
-						<p className="text-[0.95rem] font-semibold tracking-tight text-white">NodePilot</p>
-						<p className="text-[0.68rem] uppercase tracking-[0.22em] text-muted">Home server</p>
+						<p className="text-lg font-bold uppercase leading-none tracking-wide">NodePilot</p>
+						<p className="label mt-1 text-ink/80">Unit 01 · Home server</p>
 					</div>
 				</Link>
 
-				<div className="mx-2 my-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-
-				<nav className="flex flex-col gap-1">
+				<nav className="flex flex-col gap-2 p-4" aria-label="Main">
 					{NAV_ITEMS.map((item) => {
 						const active = isActive(pathname, item.href);
 						const Icon = item.icon;
@@ -50,49 +49,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 								key={item.href}
 								href={item.href}
 								className={cn(
-									"relative flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors",
-									active ? "text-white" : "text-slate-400 hover:text-slate-200",
+									"relative flex min-h-11 items-center gap-3 border-2 px-3 font-mono text-sm font-bold uppercase transition-colors",
+									active ? "border-ink text-accent" : "border-transparent text-ink hover:border-ink hover:bg-ground",
 								)}
 							>
 								{active ? (
-									<motion.span
-										layoutId="sidebar-active"
-										transition={{ type: "spring", stiffness: 420, damping: 34 }}
-										className="absolute inset-0 rounded-2xl border border-white/10 bg-gradient-to-r from-cyan-400/15 via-sky-400/10 to-violet-400/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-									/>
+									<motion.span layoutId="sidebar-active" transition={{ type: "spring", stiffness: 600, damping: 40 }} className="absolute inset-0 bg-ink" />
 								) : null}
-								<Icon className={cn("relative size-[1.15rem]", active && "text-cyan-300")} />
+								<span className={cn("relative text-[0.65rem]", active ? "text-accent/80" : "text-muted")}>{item.code}</span>
+								<Icon className="relative size-4" />
 								<span className="relative">{item.label}</span>
-								{active ? (
-									<motion.span
-										layoutId="sidebar-dot"
-										className="relative ml-auto size-1.5 rounded-full bg-cyan-300 shadow-[0_0_10px_2px_rgba(103,232,249,0.7)]"
-									/>
-								) : null}
 							</Link>
 						);
 					})}
 				</nav>
 
-				<div className="mt-auto rounded-2xl border border-white/8 bg-white/[0.03] p-3">
+				<div className="mt-auto border-t-2 border-ink p-4">
 					<div className="flex items-center gap-3">
-						<div className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-violet-500 text-sm font-semibold text-slate-950">
+						<div className="grid size-10 place-items-center border-2 border-ink bg-ground font-mono text-base font-bold">
 							{user?.username.slice(0, 1).toUpperCase()}
 						</div>
 						<div className="min-w-0 flex-1">
-							<p className="truncate text-sm font-medium text-white">{user?.username}</p>
-							<p className="flex items-center gap-1.5 text-[0.7rem] text-emerald-300/90">
-								<span className="relative flex size-1.5">
-									<span className="absolute inline-flex size-full rounded-full bg-emerald-400 animate-ping-slow" />
-									<span className="relative inline-flex size-1.5 rounded-full bg-emerald-400" />
-								</span>
-								Administrator
+							<p className="truncate text-sm font-bold">{user?.username}</p>
+							<p className="label flex items-center gap-1.5 text-muted">
+								<span className="led size-2.5 border-[1.5px] bg-ok" />
+								Admin
 							</p>
 						</div>
 						<button
 							type="button"
 							onClick={() => void logout()}
-							className="grid size-8 place-items-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-rose-300"
+							className="grid size-10 place-items-center border-2 border-ink bg-surface shadow-[3px_3px_0_var(--ink)] transition hover:bg-alert active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
 							aria-label="Sign out"
 							title="Sign out"
 						>
@@ -103,35 +90,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 			</motion.aside>
 
 			{/* Mobile top bar */}
-			<header className="sticky top-0 z-30 flex items-center justify-between px-4 pb-2 pt-[max(env(safe-area-inset-top),1rem)] lg:hidden">
+			<header className="sticky top-0 z-30 flex items-center justify-between border-b-2 border-ink bg-ground px-4 pb-3 pt-[max(env(safe-area-inset-top),0.75rem)] lg:hidden">
 				<Link href="/" className="flex items-center gap-2.5">
-					<Logo size={32} />
-					<span className="font-semibold tracking-tight text-white">NodePilot</span>
+					<Logo size={34} />
+					<span className="text-lg font-bold uppercase tracking-wide">NodePilot</span>
 				</Link>
 				<button
 					type="button"
 					onClick={() => void logout()}
-					className="glass grid size-10 place-items-center rounded-2xl text-slate-300"
+					className="grid size-10 place-items-center border-2 border-ink bg-surface shadow-[3px_3px_0_var(--ink)]"
 					aria-label="Sign out"
 				>
 					<LogOut className="size-4" />
 				</button>
 			</header>
 
-			<main className="mx-auto w-full max-w-[1400px] px-4 pb-32 pt-2 sm:px-6 lg:px-8 lg:pb-10 lg:pt-8">
+			<main className="mx-auto w-full max-w-[1400px] px-4 pb-32 pt-6 sm:px-6 lg:px-8 lg:pb-10 lg:pt-8">
 				<motion.div
 					key={pathname}
-					initial={{ opacity: 0, y: 14, filter: "blur(4px)" }}
-					animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-					transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+					initial={{ opacity: 0, y: 12 }}
+					animate={{ opacity: 1, y: 0 }}
+					transition={{ type: "spring", stiffness: 420, damping: 36 }}
 				>
 					{children}
 				</motion.div>
 			</main>
 
 			{/* Mobile tab bar */}
-			<nav className="glass fixed inset-x-4 bottom-[max(env(safe-area-inset-bottom),1rem)] z-40 flex rounded-[1.4rem] p-1.5 lg:hidden">
-				{NAV_ITEMS.map((item) => {
+			<nav
+				aria-label="Main"
+				className="panel fixed inset-x-4 bottom-[max(env(safe-area-inset-bottom),1rem)] z-40 grid grid-cols-3 lg:hidden"
+			>
+				{NAV_ITEMS.map((item, index) => {
 					const active = isActive(pathname, item.href);
 					const Icon = item.icon;
 
@@ -140,19 +130,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 							key={item.href}
 							href={item.href}
 							className={cn(
-								"relative flex flex-1 flex-col items-center gap-1 rounded-2xl py-2 text-[0.7rem] font-medium transition-colors",
-								active ? "text-white" : "text-slate-400",
+								"relative flex min-h-14 flex-col items-center justify-center gap-1 font-mono text-[0.65rem] font-bold uppercase",
+								index > 0 && "border-l-2 border-ink",
+								active ? "text-accent" : "text-ink",
 							)}
 						>
 							{active ? (
-								<motion.span
-									layoutId="tabbar-active"
-									transition={{ type: "spring", stiffness: 420, damping: 34 }}
-									className="absolute inset-0 rounded-2xl bg-gradient-to-b from-white/10 to-white/[0.03]"
-								/>
+								<motion.span layoutId="tabbar-active" transition={{ type: "spring", stiffness: 600, damping: 40 }} className="absolute inset-0 bg-ink" />
 							) : null}
-							<Icon className={cn("relative size-5", active && "text-cyan-300")} />
-							<span className="relative">{item.label}</span>
+							<Icon className="relative size-5" />
+							<span className="relative">{item.label.split(" ")[0]}</span>
 						</Link>
 					);
 				})}

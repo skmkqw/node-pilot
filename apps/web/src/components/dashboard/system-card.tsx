@@ -1,9 +1,10 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Clock, Cpu, Server } from "lucide-react";
+import { Server } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/card";
 import type { SystemOverview } from "@/lib/api/types";
+import { cn } from "@/lib/cn";
 import { formatDuration } from "@/lib/format";
 
 export function SystemCard({ overview }: { overview: SystemOverview | null }) {
@@ -12,65 +13,61 @@ export function SystemCard({ overview }: { overview: SystemOverview | null }) {
 
 	const loads = load
 		? [
-				{ label: "1 min", value: load.oneMinute },
-				{ label: "5 min", value: load.fiveMinutes },
-				{ label: "15 min", value: load.fifteenMinutes },
+				{ label: "1 MIN", value: load.oneMinute },
+				{ label: "5 MIN", value: load.fiveMinutes },
+				{ label: "15 MIN", value: load.fifteenMinutes },
 			]
 		: [];
 
 	return (
-		<Card glow="#818cf8" className="p-5 sm:p-6">
+		<Card className="p-5 sm:p-6">
 			<CardHeader
 				icon={<Server className="size-5" />}
-				accent="#818cf8"
+				channel="CH-G / Host"
 				title={overview?.hostname ?? "Server"}
-				subtitle={overview ? overview.operatingSystem : "Loading…"}
+				subtitle={overview ? overview.operatingSystem.toUpperCase() : "LOADING…"}
 			/>
 
-			<div className="mt-5 grid grid-cols-3 gap-2">
-				<InfoTile icon={<Clock className="size-3.5" />} label="Uptime" value={formatDuration(overview?.uptimeSeconds)} />
-				<InfoTile icon={<Cpu className="size-3.5" />} label="Cores" value={overview ? String(cores) : "—"} />
+			<dl className="mt-5 grid grid-cols-3 border-2 border-ink">
+				<InfoTile label="Uptime" value={formatDuration(overview?.uptimeSeconds)} />
+				<InfoTile label="Cores" value={overview ? String(cores) : "—"} className="border-x-2 border-ink" />
 				<InfoTile label="Arch" value={overview?.architecture ?? "—"} />
-			</div>
+			</dl>
 
 			<div className="mt-5">
-				<p className="text-[0.68rem] uppercase tracking-[0.16em] text-slate-500">Load average</p>
+				<p className="label">Load average / per core</p>
 				<div className="mt-3 space-y-2.5">
 					{loads.map((item, index) => {
 						const ratio = Math.min(item.value / cores, 1);
-						const color = ratio > 0.9 ? "#fb7185" : ratio > 0.7 ? "#fbbf24" : "#818cf8";
+						const fill = ratio > 0.9 ? "bg-alert" : ratio > 0.7 ? "bg-accent" : "bg-ink";
 
 						return (
-							<div key={item.label} className="flex items-center gap-3 text-xs">
-								<span className="w-12 text-slate-400">{item.label}</span>
-								<div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+							<div key={item.label} className="flex items-center gap-3 font-mono text-xs">
+								<span className="w-14 font-bold">{item.label}</span>
+								<div className="h-4 flex-1 border-2 border-ink bg-surface p-[2px]">
 									<motion.div
-										className="h-full rounded-full"
-										style={{ background: `linear-gradient(90deg, ${color}66, ${color})`, boxShadow: `0 0 12px ${color}` }}
+										className={cn("h-full", fill)}
 										initial={{ width: 0 }}
 										animate={{ width: `${Math.max(ratio * 100, 2)}%` }}
-										transition={{ type: "spring", stiffness: 60, damping: 18, delay: index * 0.08 }}
+										transition={{ type: "spring", stiffness: 160, damping: 22, delay: index * 0.08 }}
 									/>
 								</div>
-								<span className="w-10 text-right font-mono text-slate-200 tabular">{item.value.toFixed(2)}</span>
+								<span className="w-10 text-right font-bold tabular">{item.value.toFixed(2)}</span>
 							</div>
 						);
 					})}
-					{!loads.length ? <div className="skeleton h-14 rounded-xl" /> : null}
+					{!loads.length ? <div className="skeleton h-14" /> : null}
 				</div>
 			</div>
 		</Card>
 	);
 }
 
-function InfoTile({ icon, label, value }: { icon?: React.ReactNode; label: string; value: string }) {
+function InfoTile({ label, value, className }: { label: string; value: string; className?: string }) {
 	return (
-		<div className="rounded-2xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
-			<p className="flex items-center gap-1 text-[0.65rem] uppercase tracking-[0.14em] text-slate-500">
-				{icon}
-				{label}
-			</p>
-			<p className="mt-1 truncate text-sm font-medium text-white">{value}</p>
+		<div className={cn("px-3 py-2", className)}>
+			<dt className="label text-muted">{label}</dt>
+			<dd className="mt-0.5 truncate text-sm font-bold">{value}</dd>
 		</div>
 	);
 }

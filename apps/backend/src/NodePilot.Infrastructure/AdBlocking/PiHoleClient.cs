@@ -4,7 +4,6 @@ using System.Text;
 using System.Text.Json;
 using ErrorOr;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using NodePilot.Application.AdBlocking.Errors;
 using NodePilot.Application.AdBlocking.Models;
 using NodePilot.Application.AdBlocking.Settings;
@@ -21,33 +20,103 @@ public sealed class PiHoleClient : IAdBlockerService
     private const int _maxDurationSeconds = 24 * 60 * 60;
 
     private readonly HttpClient _httpClient;
-    private readonly IOptionsMonitor<PiHoleSettings> _settings;
+    private readonly IPiHoleSettingsStore _settingsStore;
     private readonly PiHoleSessionStore _sessionStore;
     private readonly ILogger<PiHoleClient> _logger;
 
     public PiHoleClient(
         HttpClient httpClient,
-        IOptionsMonitor<PiHoleSettings> settings,
+        IPiHoleSettingsStore settingsStore,
         PiHoleSessionStore sessionStore,
         ILogger<PiHoleClient> logger)
     {
         _httpClient = httpClient;
-        _settings = settings;
+        _settingsStore = settingsStore;
         _sessionStore = sessionStore;
         _logger = logger;
     }
 
     public async Task<AdBlockerStatus> GetStatusAsync(CancellationToken ct = default)
     {
-        if (!_settings.CurrentValue.IsConfigured)
+        var settings = await _settingsStore.GetEffectiveAsync(ct);
+
+        if (!settings.IsConfigured)
         {
             return AdBlockerStatus.NotConfigured();
         }
 
+        return await ReadStatusAsync(settings, CachedSession(settings), ct);
+    }
+
+    public async Task<ErrorOr<AdBlockerStatus>> SetBlockingAsync(
+        bool enabled,
+        int? durationSeconds,
+        CancellationToken ct = default)
+    {
+        var settings = await _settingsStore.GetEffectiveAsync(ct);
+
+        if (!settings.IsConfigured)
+        {
+            return AdBlockerErrors.NotConfigured;
+        }
+
+        if (durationSeconds is < 1 or > _maxDurationSeconds)
+        {
+            return AdBlockerErrors.InvalidDuration;
+        }
+
         try
         {
-            var blocking = await SendAsync<PiHoleBlockingResponse>(HttpMethod.Get, "api/dns/blocking", null, ct);
-            var summary = await SendAsync<PiHoleSummaryResponse>(HttpMethod.Get, "api/stats/summary", null, ct);
+            await SendAsync<PiHoleBlockingResponse>(
+                settings,
+                CachedSession(settings),
+                HttpMethod.Post,
+                "api/dns/blocking",
+                new PiHoleBlockingRequest(enabled, durationSeconds),
+                ct);
+
+            _logger.LogInformation(
+                "Pi-hole blocking set to {Enabled} for {Duration}.",
+                enabled,
+                durationSeconds is null ? "unlimited time" : $"{durationSeconds} s");
+        }
+        catch (Exception ex) when (IsUpstreamFailure(ex) && !ct.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Changing Pi-hole blocking failed.");
+
+            return AdBlockerErrors.Unreachable(DescribeFailure(ex));
+        }
+
+        return await ReadStatusAsync(settings, CachedSession(settings), ct);
+    }
+
+    public async Task<AdBlockerStatus> TestConnectionAsync(PiHoleSettings candidate, CancellationToken ct = default)
+    {
+        if (!candidate.IsConfigured)
+        {
+            return AdBlockerStatus.NotConfigured();
+        }
+
+        // A separate, short-lived session: testing must not replace the cached one, and it is
+        // logged out afterwards so it does not count against Pi-hole's session limit.
+        var session = new OneOffSession(ct => AuthenticateAsync(candidate, ct));
+
+        try
+        {
+            return await ReadStatusAsync(candidate, session, ct);
+        }
+        finally
+        {
+            await TryLogoutAsync(candidate, session.Sid);
+        }
+    }
+
+    private async Task<AdBlockerStatus> ReadStatusAsync(PiHoleSettings settings, ISession session, CancellationToken ct)
+    {
+        try
+        {
+            var blocking = await SendAsync<PiHoleBlockingResponse>(settings, session, HttpMethod.Get, "api/dns/blocking", null, ct);
+            var summary = await SendAsync<PiHoleSummaryResponse>(settings, session, HttpMethod.Get, "api/stats/summary", null, ct);
 
             return new AdBlockerStatus(
                 Configured: true,
@@ -75,52 +144,20 @@ public sealed class PiHoleClient : IAdBlockerService
         }
     }
 
-    public async Task<ErrorOr<AdBlockerStatus>> SetBlockingAsync(
-        bool enabled,
-        int? durationSeconds,
-        CancellationToken ct = default)
+    private async Task<T> SendAsync<T>(
+        PiHoleSettings settings,
+        ISession session,
+        HttpMethod method,
+        string path,
+        object? body,
+        CancellationToken ct)
     {
-        if (!_settings.CurrentValue.IsConfigured)
-        {
-            return AdBlockerErrors.NotConfigured;
-        }
-
-        if (durationSeconds is < 1 or > _maxDurationSeconds)
-        {
-            return AdBlockerErrors.InvalidDuration;
-        }
-
-        try
-        {
-            await SendAsync<PiHoleBlockingResponse>(
-                HttpMethod.Post,
-                "api/dns/blocking",
-                new PiHoleBlockingRequest(enabled, durationSeconds),
-                ct);
-
-            _logger.LogInformation(
-                "Pi-hole blocking set to {Enabled} for {Duration}.",
-                enabled,
-                durationSeconds is null ? "unlimited time" : $"{durationSeconds} s");
-        }
-        catch (Exception ex) when (IsUpstreamFailure(ex) && !ct.IsCancellationRequested)
-        {
-            _logger.LogWarning(ex, "Changing Pi-hole blocking failed.");
-
-            return AdBlockerErrors.Unreachable(DescribeFailure(ex));
-        }
-
-        return await GetStatusAsync(ct);
-    }
-
-    private async Task<T> SendAsync<T>(HttpMethod method, string path, object? body, CancellationToken ct)
-    {
-        // Retry once with a fresh session when the cached one has expired.
+        // Retry once with a fresh session when the current one has expired.
         for (int attempt = 0; ; attempt++)
         {
-            string? sid = await _sessionStore.GetOrCreateAsync(AuthenticateAsync, ct);
+            string? sid = await session.GetSidAsync(ct);
 
-            using var request = new HttpRequestMessage(method, BuildUri(path));
+            using var request = new HttpRequestMessage(method, BuildUri(settings, path));
 
             if (sid is not null)
             {
@@ -136,7 +173,7 @@ public sealed class PiHoleClient : IAdBlockerService
 
             if (response.StatusCode == HttpStatusCode.Unauthorized && attempt == 0)
             {
-                _sessionStore.Invalidate();
+                session.Invalidate();
                 continue;
             }
 
@@ -147,23 +184,21 @@ public sealed class PiHoleClient : IAdBlockerService
         }
     }
 
-    private async Task<string?> AuthenticateAsync(CancellationToken ct)
+    private async Task<string?> AuthenticateAsync(PiHoleSettings settings, CancellationToken ct)
     {
-        string password = _settings.CurrentValue.Password;
-
-        if (string.IsNullOrEmpty(password))
+        if (string.IsNullOrEmpty(settings.Password))
         {
             return null;
         }
 
         using var response = await _httpClient.PostAsync(
-            BuildUri("api/auth"),
-            CreateJsonContent(new PiHoleAuthRequest(password)),
+            BuildUri(settings, "api/auth"),
+            CreateJsonContent(new PiHoleAuthRequest(settings.Password)),
             ct);
 
         if (response.StatusCode == HttpStatusCode.Unauthorized)
         {
-            throw new PiHoleAuthenticationException("Pi-hole rejected the configured password.");
+            throw new PiHoleAuthenticationException("Pi-hole rejected the password.");
         }
 
         response.EnsureSuccessStatusCode();
@@ -178,6 +213,28 @@ public sealed class PiHoleClient : IAdBlockerService
         return auth.Session.Sid;
     }
 
+    private async Task TryLogoutAsync(PiHoleSettings settings, string? sid)
+    {
+        if (sid is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Delete, BuildUri(settings, "api/auth"));
+            request.Headers.Add(_sessionHeader, sid);
+            using var _ = await _httpClient.SendAsync(request);
+        }
+        catch (Exception ex) when (IsUpstreamFailure(ex))
+        {
+            _logger.LogDebug(ex, "Logging out of the Pi-hole test session failed.");
+        }
+    }
+
+    private CachedSessionAdapter CachedSession(PiHoleSettings settings) =>
+        new(_sessionStore, settings, ct => AuthenticateAsync(settings, ct));
+
     // Buffered (not chunked) JSON with an explicit Content-Length, which the embedded
     // web server of Pi-hole handles reliably.
     private static StringContent CreateJsonContent(object body)
@@ -185,9 +242,9 @@ public sealed class PiHoleClient : IAdBlockerService
         return new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
     }
 
-    private Uri BuildUri(string path)
+    private static Uri BuildUri(PiHoleSettings settings, string path)
     {
-        var baseUri = new Uri(_settings.CurrentValue.BaseUrl.TrimEnd('/') + "/");
+        var baseUri = new Uri(settings.BaseUrl.TrimEnd('/') + "/");
 
         return new Uri(baseUri, path);
     }
@@ -210,9 +267,46 @@ public sealed class PiHoleClient : IAdBlockerService
             TaskCanceledException => "Pi-hole did not respond in time.",
             HttpRequestException { StatusCode: not null } http => $"Pi-hole responded with HTTP {(int)http.StatusCode.Value}.",
             HttpRequestException => "Pi-hole could not be reached.",
-            UriFormatException => "PiHole:BaseUrl is not a valid URL.",
+            UriFormatException => "The Pi-hole address is not a valid URL.",
             _ => "Pi-hole returned an unexpected response.",
         };
+    }
+
+    private interface ISession
+    {
+        Task<string?> GetSidAsync(CancellationToken ct);
+
+        void Invalidate();
+    }
+
+    private sealed class CachedSessionAdapter(
+        PiHoleSessionStore store,
+        PiHoleSettings settings,
+        Func<CancellationToken, Task<string?>> authenticate) : ISession
+    {
+        public Task<string?> GetSidAsync(CancellationToken ct) => store.GetOrCreateAsync(settings, authenticate, ct);
+
+        public void Invalidate() => store.Invalidate();
+    }
+
+    private sealed class OneOffSession(Func<CancellationToken, Task<string?>> authenticate) : ISession
+    {
+        private bool _authenticated;
+
+        public string? Sid { get; private set; }
+
+        public async Task<string?> GetSidAsync(CancellationToken ct)
+        {
+            if (!_authenticated)
+            {
+                Sid = await authenticate(ct);
+                _authenticated = true;
+            }
+
+            return Sid;
+        }
+
+        public void Invalidate() => _authenticated = false;
     }
 }
 
