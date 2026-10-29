@@ -2,15 +2,15 @@
 
 Base URL: `http://<server>:5000`. All responses are JSON and enums are serialized as strings. Errors use [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) (`title`, `status`, and `errors` for validation failures).
 
-Every endpoint except `/health`, `GET /api/auth/status`, `POST /api/auth/setup` and `POST /api/auth/login` requires the session cookie `nodepilot.session`. Without it, the API answers **401**.
+Every endpoint except `/health`, `GET /api/auth/status`, `POST /api/auth/setup`, `POST /api/auth/login` and the two `/api/invite/{token}` endpoints requires the session cookie `nodepilot.session`. Without it, the API answers **401**. Endpoints marked *admin* answer **403** to members.
 
 | Status | Meaning |
 |---|---|
 | 400 | Validation error (invalid range, name, duration …) |
 | 401 | Not signed in / wrong credentials |
-| 403 | Forbidden: path outside the file manager root, deleting the root |
+| 403 | Forbidden: path outside the file manager root, deleting the root, admin-only endpoint |
 | 404 | Not found |
-| 409 | Conflict: a file or folder with that name exists |
+| 409 | Conflict: a file or folder with that name exists, username taken |
 | 429 | Too many login attempts (5 per minute per IP) |
 | 502 | Pi-hole could not be reached or rejected the request |
 
@@ -18,19 +18,42 @@ Every endpoint except `/health`, `GET /api/auth/status`, `POST /api/auth/setup` 
 
 | Method | Path | Body | Result |
 |---|---|---|---|
-| GET | `/api/auth/status` | – | `{ "setupRequired", "authenticated", "username" }` (public) |
-| POST | `/api/auth/setup` | `{ "username", "password" }` | `201` + cookie. Only while no account exists, otherwise `409`. |
-| POST | `/api/auth/login` | `{ "username", "password", "rememberMe" }` | `200 { "username" }` + cookie |
+| GET | `/api/auth/status` | – | `{ "setupRequired", "authenticated", "username", "role" }` (public) |
+| POST | `/api/auth/setup` | `{ "username", "password" }` | `201` + cookie. Creates the first **Admin**; only while no account exists, otherwise `409`. |
+| POST | `/api/auth/login` | `{ "username", "password", "rememberMe" }` | `200 { "username", "role" }` + cookie |
 | POST | `/api/auth/logout` | – | `204` |
-| GET | `/api/auth/me` | – | `200 { "username" }` |
+| GET | `/api/auth/me` | – | `200 { "username", "role" }` |
 | POST | `/api/auth/password` | `{ "currentPassword", "newPassword" }` | `204` |
 
 - Usernames: 3–32 characters (`A–Z a–z 0–9 . _ -`), case-insensitive. Passwords: 8–128 characters.
 - Passwords are stored as PBKDF2 hashes (ASP.NET Core Identity format v3).
 - Setup and login share the rate limit (`Auth:LoginAttemptsPerMinute`, default 5 per IP).
 - `rememberMe: true` makes the cookie persistent (lifetime `Auth:SessionLifetimeHours`, sliding).
+- Roles: `Admin` or `Member`. The session is re-checked on every request: a removed account gets `401`, a changed role applies immediately.
 
-## Settings
+## Users and invitations (admin)
+
+| Method | Path | Body | Result |
+|---|---|---|---|
+| GET | `/api/users` | – | `[{ "id", "username", "role", "createdAtUtc" }]` |
+| PUT | `/api/users/{id}/role` | `{ "role": "Admin" \| "Member" }` | Updated user. Your own role cannot be changed (`400`). |
+| DELETE | `/api/users/{id}` | – | `204`. You cannot remove yourself (`400`); links the user created are revoked. |
+| GET | `/api/invitations` | – | Unused, unexpired links: `[{ "id", "role", "createdBy", "createdAtUtc", "expiresAtUtc" }]` |
+| POST | `/api/invitations` | `{ "role", "validForHours" }` (1–168, default `Member`, 24) | `201 { "id", "token", "role", "expiresAtUtc" }`; the token is returned only here |
+| DELETE | `/api/invitations/{id}` | – | `204`, revokes the link |
+
+The web app turns the token into `http://<host>:3000/invite/<token>`. Tokens are 32 random bytes (base64url); the database stores only their SHA-256 hash.
+
+### Invite page (public, rate-limited like login)
+
+| Method | Path | Body | Result |
+|---|---|---|---|
+| GET | `/api/invite/{token}` | – | `{ "role", "invitedBy", "expiresAtUtc" }` |
+| POST | `/api/invite/{token}/accept` | `{ "username", "password" }` | `201 { "username", "role" }` + cookie. `409` if the username is taken (the link stays usable). |
+
+An unknown, expired, used or revoked link always answers `404` with the same message, so a guessed token reveals nothing.
+
+## Settings (admin)
 
 | Method | Path | Body | Result |
 |---|---|---|---|
@@ -46,7 +69,7 @@ The Pi-hole password is encrypted with ASP.NET Core Data Protection; the key rin
 | Method | Path | Result |
 |---|---|---|
 | GET | `/api/system/metrics/current` | Latest persisted sample (`Success` or `PartialSuccess`) |
-| GET | `/api/system/metrics/historical?start&end&minIntervalSeconds` | Time-bucketed summaries (min/avg/max), range ≤ 7 days, buckets ≥ 5 s |
+| GET | `/api/system/metrics/historical?start&end&minIntervalSeconds` | Time-bucketed summaries (min/avg/max of CPU %, RAM % and CPU °C), range ≤ 7 days, buckets ≥ 5 s |
 | GET | `/api/system/overview` | Live host info: hostname, OS, uptime, load average, memory, CPU temperature, disk usage |
 
 Example `GET /api/system/overview`:
