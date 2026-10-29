@@ -24,6 +24,14 @@ const sizes = {
 	icon: "size-10",
 };
 
+const base =
+	"relative inline-flex shrink-0 items-center justify-center font-mono font-bold uppercase tracking-wide transition-colors duration-150 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-50";
+
+/** Button look for links (`<a>`/`<Link>`), which must not wrap a real `<button>`. */
+export function buttonStyles(variant: keyof typeof variants = "secondary", size: keyof typeof sizes = "md", className?: string) {
+	return cn(base, variants[variant], sizes[size], "active:translate-x-[3px] active:translate-y-[3px] active:shadow-none", className);
+}
+
 /**
  * Hardware-style push button: pressing it moves it into its own shadow,
  * like a physical key going down.
@@ -44,12 +52,7 @@ export function Button({
 			whileTap={hasShadow ? { x: 3, y: 3, boxShadow: "1px 1px 0 var(--ink)" } : { scale: 0.97 }}
 			transition={{ type: "spring", stiffness: 700, damping: 30 }}
 			disabled={disabled || isLoading}
-			className={cn(
-				"relative inline-flex shrink-0 items-center justify-center font-mono font-bold uppercase tracking-wide transition-colors duration-150 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-50",
-				variants[variant],
-				sizes[size],
-				className,
-			)}
+			className={cn(base, variants[variant], sizes[size], className)}
 			{...props}
 		>
 			{isLoading ? <LoaderCircle className="size-4 animate-spin" /> : null}
