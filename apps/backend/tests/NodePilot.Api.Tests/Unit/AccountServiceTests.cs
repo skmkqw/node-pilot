@@ -129,6 +129,11 @@ public class AccountServiceTests
         public Task<UserAccount?> GetByUsernameAsync(string username, CancellationToken ct = default) =>
             Task.FromResult(_items.FirstOrDefault(item => string.Equals(item.Username, username, StringComparison.OrdinalIgnoreCase)));
 
+        public Task<IReadOnlyList<UserAccount>> ListAsync(CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<UserAccount>>(_items.ToList());
+
+        public void Remove(UserAccount account) => _items.Remove(account);
+
         public Task AddAsync(UserAccount account, CancellationToken ct = default)
         {
             // Like EF Core: the generated key is written back to the same instance.
