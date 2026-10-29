@@ -18,6 +18,12 @@ public sealed class UserAccountRepository(NodePilotDbContext dbContext) : IUserA
     public Task<UserAccount?> GetByUsernameAsync(string username, CancellationToken ct = default) =>
         _dbContext.Users.FirstOrDefaultAsync(user => user.Username == username, ct);
 
+    public async Task<IReadOnlyList<UserAccount>> ListAsync(CancellationToken ct = default) =>
+        await _dbContext.Users.OrderBy(user => user.CreatedAtUtc).ToListAsync(ct);
+
     public async Task AddAsync(UserAccount account, CancellationToken ct = default) =>
         await _dbContext.Users.AddAsync(account, ct);
+
+    public void Remove(UserAccount account) =>
+        _dbContext.Users.Remove(account);
 }

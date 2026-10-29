@@ -11,6 +11,8 @@ public sealed class NodePilotDbContext(DbContextOptions<NodePilotDbContext> opti
 
     public DbSet<UserAccount> Users => Set<UserAccount>();
 
+    public DbSet<Invitation> Invitations => Set<Invitation>();
+
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

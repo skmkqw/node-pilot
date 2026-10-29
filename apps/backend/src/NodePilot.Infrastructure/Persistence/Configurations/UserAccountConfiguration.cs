@@ -32,6 +32,14 @@ public class UserAccountConfiguration : IEntityTypeConfiguration<UserAccount>
             .HasMaxLength(512)
             .IsRequired();
 
+        builder.Property(x => x.Role)
+            .HasColumnName("role")
+            .HasConversion<string>()
+            .HasMaxLength(16)
+            .IsRequired();
+
+        builder.HasCheckConstraint("ck_users_role", "role IN ('Admin', 'Member')");
+
         builder.Property(x => x.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .HasConversion(value => value, value => DateTime.SpecifyKind(value, DateTimeKind.Utc))
