@@ -3,11 +3,11 @@
 import { motion } from "motion/react";
 
 const LEVELS = [
-	{ label: "Too short", color: "#fb7185" },
-	{ label: "Weak", color: "#fb923c" },
-	{ label: "Fair", color: "#fbbf24" },
-	{ label: "Good", color: "#a3e635" },
-	{ label: "Strong", color: "#34d399" },
+	{ label: "Too short", fill: "var(--alert)" },
+	{ label: "Weak", fill: "var(--alert)" },
+	{ label: "Fair", fill: "var(--accent)" },
+	{ label: "Good", fill: "var(--ok)" },
+	{ label: "Strong", fill: "var(--ink)" },
 ];
 
 /** Rough strength estimate: length plus character variety. Only guidance; the server enforces the minimum. */
@@ -26,21 +26,21 @@ export function PasswordStrength({ password }: { password: string }) {
 
 	return (
 		<div className="mt-2" aria-live="polite">
-			<div className="flex gap-1">
+			<div className="grid grid-cols-4 gap-1">
 				{LEVELS.slice(1).map((_, index) => (
-					<div key={index} className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.08]">
+					<div key={index} className="h-2.5 border-[1.5px] border-ink bg-surface">
 						<motion.div
-							className="h-full rounded-full"
-							style={{ background: level.color, boxShadow: `0 0 8px ${level.color}` }}
+							className="h-full"
+							style={{ background: level.fill }}
 							initial={false}
 							animate={{ width: password && index < score ? "100%" : "0%" }}
-							transition={{ type: "spring", stiffness: 300, damping: 30, delay: index * 0.04 }}
+							transition={{ duration: 0.12, delay: index * 0.05 }}
 						/>
 					</div>
 				))}
 			</div>
 			{password ? (
-				<p className="mt-1.5 text-xs" style={{ color: level.color }}>
+				<p className="label mt-1.5">
 					{level.label}
 					{score === 0 ? " — at least 8 characters" : ""}
 				</p>
