@@ -41,6 +41,28 @@ public class SystemMetricsProviderTests
     }
 
     [Test]
+    public async Task GetHistoricalMetrics_SummarisesTemperature_SkippingSamplesWithoutSensor()
+    {
+        var now = DateTime.UtcNow;
+        var bucketStart = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, DateTimeKind.Utc).AddMinutes(-5);
+
+        var provider = new SystemMetricsProvider(new FakeRepository(
+        [
+            Sample(bucketStart.AddSeconds(5), cpu: 10, temperature: 48),
+            Sample(bucketStart.AddSeconds(20), cpu: 10, temperature: null),
+            Sample(bucketStart.AddSeconds(35), cpu: 10, temperature: 56),
+        ]));
+
+        var result = await provider.GetHistoricalMetricsAsync(now.AddMinutes(-10), now, minBucketSizeSeconds: 60);
+
+        var bucket = result.Value.Single();
+        Assert.That(bucket.TemperatureMeasuredSamples, Is.EqualTo(2));
+        Assert.That(bucket.AverageCpuTemperatureCelsius, Is.EqualTo(52));
+        Assert.That(bucket.MinCpuTemperatureCelsius, Is.EqualTo(48));
+        Assert.That(bucket.MaxCpuTemperatureCelsius, Is.EqualTo(56));
+    }
+
+    [Test]
     public async Task GetHistoricalMetrics_RangeOverSevenDays_ReturnsValidationError()
     {
         var provider = new SystemMetricsProvider(new FakeRepository([]));
@@ -51,10 +73,11 @@ public class SystemMetricsProviderTests
         Assert.That(result.FirstError.Code, Is.EqualTo("SystemMetrics.History.RangeTooLarge"));
     }
 
-    private static SystemMetric Sample(DateTime collectedAt, double cpu) => new()
+    private static SystemMetric Sample(DateTime collectedAt, double cpu, double? temperature = null) => new()
     {
         CpuEnabled = true,
         CpuUsagePercent = cpu,
+        CpuTemperatureCelsius = temperature,
         RamEnabled = true,
         RamUsagePercent = 50,
         Status = MetricCollectionStatus.Success,
