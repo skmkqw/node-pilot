@@ -82,8 +82,8 @@ export function PiHoleForm({ info, onSaved, onDisconnected, secondaryAction }: P
 	return (
 		<form onSubmit={save} className="space-y-4">
 			{info?.source === "Environment" ? (
-				<p className="rounded-2xl border border-sky-300/15 bg-sky-400/[0.06] px-4 py-3 text-xs leading-5 text-sky-100/80">
-					Currently configured through environment variables. Saving here takes precedence.
+				<p className="flex items-center gap-2 border-2 border-ink bg-ground px-3 py-2 font-mono text-xs">
+					<span className="led bg-accent" /> Configured through environment variables. Saving here takes precedence.
 				</p>
 			) : null}
 
@@ -128,16 +128,16 @@ export function PiHoleForm({ info, onSaved, onDisconnected, secondaryAction }: P
 						className="overflow-hidden"
 					>
 						{result.reachable ? (
-							<div className="flex items-start gap-3 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
-								<CircleCheck className="mt-0.5 size-4 shrink-0 text-emerald-300" />
+							<div className="flex items-start gap-3 border-2 border-ink bg-ok px-3 py-2.5 font-mono text-sm font-bold">
+								<CircleCheck className="mt-0.5 size-4 shrink-0" />
 								<span>
 									Connected. Blocking is {result.blockingEnabled ? "on" : "off"}, {formatCompact(result.totalQueries)} queries
 									today, {result.activeClients ?? 0} devices.
 								</span>
 							</div>
 						) : (
-							<div className="flex items-start gap-3 rounded-2xl border border-rose-300/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
-								<TriangleAlert className="mt-0.5 size-4 shrink-0 text-rose-300" />
+							<div className="flex items-start gap-3 border-2 border-ink bg-alert px-3 py-2.5 font-mono text-sm font-bold">
+								<TriangleAlert className="mt-0.5 size-4 shrink-0" />
 								<span>{result.message ?? "Pi-hole could not be reached."}</span>
 							</div>
 						)}
@@ -145,7 +145,7 @@ export function PiHoleForm({ info, onSaved, onDisconnected, secondaryAction }: P
 				) : null}
 			</AnimatePresence>
 
-			<div className="flex flex-wrap items-center gap-2 pt-1">
+			<div className="flex flex-wrap items-center gap-3 pt-1">
 				<Button type="button" variant="secondary" onClick={() => void test()} isLoading={busy === "test"} disabled={!baseUrl || busy !== null}>
 					<PlugZap className="size-4" /> Test connection
 				</Button>
@@ -157,7 +157,7 @@ export function PiHoleForm({ info, onSaved, onDisconnected, secondaryAction }: P
 					<Button
 						type="button"
 						variant="ghost"
-						className="ml-auto hover:text-rose-300"
+						className="ml-auto hover:bg-alert"
 						onClick={() => void disconnect()}
 						isLoading={busy === "disconnect"}
 						disabled={busy !== null}

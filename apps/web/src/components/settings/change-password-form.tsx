@@ -59,7 +59,7 @@ export function ChangePasswordForm() {
 			<PasswordField
 				icon={<KeyRound className="size-4" />}
 				label="Repeat new password"
-				hint={mismatch ? <span className="text-rose-300">The passwords do not match.</span> : undefined}
+				hint={mismatch ? <span className="font-bold text-danger">THE PASSWORDS DO NOT MATCH.</span> : undefined}
 				value={confirm}
 				onChange={(event) => setConfirm(event.target.value)}
 				autoComplete="new-password"
