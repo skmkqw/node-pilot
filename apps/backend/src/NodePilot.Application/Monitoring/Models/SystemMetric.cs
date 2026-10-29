@@ -12,6 +12,12 @@ public sealed class SystemMetric
 
     public double? RamUsagePercent { get; set; }
 
+    /// <summary>
+    /// Optional: not counted in <see cref="TotalReads"/>, because many machines (VMs, containers)
+    /// have no temperature sensor and that should not mark every sample as a partial failure.
+    /// </summary>
+    public double? CpuTemperatureCelsius { get; set; }
+
     public MetricCollectionStatus Status { get; init; }
 
     public int TotalReads { get; init; }

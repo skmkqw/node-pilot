@@ -10,7 +10,7 @@ import type { IntervalMetricsSummary } from "@/lib/api/types";
 import { formatDateTime, formatTime } from "@/lib/format";
 import { usePolling } from "@/lib/use-polling";
 
-type MetricKey = "cpu" | "ram";
+type MetricKey = "cpu" | "ram" | "temp";
 type RangeKey = "15m" | "1h" | "6h" | "24h";
 
 const RANGES: Record<RangeKey, { label: string; windowMs: number; intervalSeconds: number }> = {
@@ -23,9 +23,18 @@ const RANGES: Record<RangeKey, { label: string; windowMs: number; intervalSecond
 const METRIC_OPTIONS = [
 	{ value: "cpu", label: "CPU" },
 	{ value: "ram", label: "RAM" },
+	{ value: "temp", label: "TEMP" },
 ] as const;
 
-const HEIGHT = 260;
+// Both percentages and CPU temperatures fit a 0–100 scale, so all three share one axis.
+const METRICS: Record<MetricKey, { name: string; unit: string }> = {
+	cpu: { name: "CPU usage", unit: "%" },
+	ram: { name: "Memory usage", unit: "%" },
+	temp: { name: "CPU temperature", unit: "°C" },
+};
+
+/** Minimum height; the chart grows to fill its card when the row is taller. */
+const MIN_HEIGHT = 260;
 const PADDING = { top: 14, right: 44, bottom: 28, left: 4 };
 
 type Point = {
@@ -37,9 +46,18 @@ type Point = {
 };
 
 function pick(summary: IntervalMetricsSummary, metric: MetricKey) {
-	return metric === "cpu"
-		? { avg: summary.averageCpuUsagePercent, min: summary.minCpuUsagePercent, max: summary.maxCpuUsagePercent }
-		: { avg: summary.averageRamUsagePercent, min: summary.minRamUsagePercent, max: summary.maxRamUsagePercent };
+	switch (metric) {
+		case "cpu":
+			return { avg: summary.averageCpuUsagePercent, min: summary.minCpuUsagePercent, max: summary.maxCpuUsagePercent };
+		case "ram":
+			return { avg: summary.averageRamUsagePercent, min: summary.minRamUsagePercent, max: summary.maxRamUsagePercent };
+		case "temp":
+			return {
+				avg: summary.averageCpuTemperatureCelsius,
+				min: summary.minCpuTemperatureCelsius,
+				max: summary.maxCpuTemperatureCelsius,
+			};
+	}
 }
 
 /** One point per expected bucket; buckets without samples stay null and break the line. */
@@ -77,7 +95,7 @@ function segments(points: Point[]) {
 export function PerformanceChart() {
 	const [metric, setMetric] = useState<MetricKey>("cpu");
 	const [range, setRange] = useState<RangeKey>("1h");
-	const [width, setWidth] = useState(640);
+	const [size, setSize] = useState({ width: 640, height: MIN_HEIGHT });
 	const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 
@@ -100,7 +118,9 @@ export function PerformanceChart() {
 		const element = containerRef.current;
 		if (!element) return;
 
-		const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+		const observer = new ResizeObserver(([entry]) =>
+			setSize({ width: entry.contentRect.width, height: Math.max(entry.contentRect.height, MIN_HEIGHT) }),
+		);
 		observer.observe(element);
 		return () => observer.disconnect();
 	}, []);
@@ -110,8 +130,9 @@ export function PerformanceChart() {
 		return buildPoints(history.data.summaries, metric, history.data.start, history.data.end, intervalMs);
 	}, [history.data, metric, intervalMs]);
 
+	const { width, height } = size;
 	const innerWidth = Math.max(width - PADDING.left - PADDING.right, 10);
-	const innerHeight = HEIGHT - PADDING.top - PADDING.bottom;
+	const innerHeight = height - PADDING.top - PADDING.bottom;
 	const x = useCallback(
 		(index: number) => PADDING.left + (points.length <= 1 ? innerWidth / 2 : (index / (points.length - 1)) * innerWidth),
 		[points.length, innerWidth],
@@ -136,7 +157,7 @@ export function PerformanceChart() {
 	const hovered = hoverIndex !== null ? points[hoverIndex] : null;
 	const drawKey = `${metric}-${range}`;
 	const timeTicks = points.length ? [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(f * (points.length - 1))) : [];
-	const label = metric === "cpu" ? "CPU" : "Memory";
+	const { name, unit } = METRICS[metric];
 
 	const controls = (size: "sm" | "md") => (
 		<>
@@ -160,7 +181,9 @@ export function PerformanceChart() {
 				subtitle={
 					average !== null ? (
 						<span className="tabular">
-							AVG {average.toFixed(1)}% · PEAK {peak!.toFixed(1)}% · LAST {config.label.toUpperCase()}
+							AVG {average.toFixed(1)}
+							{unit} · PEAK {peak!.toFixed(1)}
+							{unit} · LAST {config.label.toUpperCase()}
 						</span>
 					) : (
 						`LAST ${config.label.toUpperCase()}`
@@ -171,18 +194,18 @@ export function PerformanceChart() {
 
 			<div className="mt-4 flex flex-wrap gap-2 sm:hidden">{controls("sm")}</div>
 
-			<div ref={containerRef} className="relative mt-5 flex-1 border-2 border-ink bg-ground/40" style={{ minHeight: HEIGHT }}>
+			<div ref={containerRef} className="relative mt-5 flex-1 border-2 border-ink bg-ground/40" style={{ minHeight: MIN_HEIGHT }}>
 				{history.isLoading && !history.data ? (
 					<div className="skeleton absolute inset-0 border-0" />
 				) : (
 					<svg
 						width={width}
-						height={HEIGHT}
+						height={height}
 						className="absolute inset-0 touch-none select-none overflow-visible"
 						onPointerMove={handlePointer}
 						onPointerLeave={() => setHoverIndex(null)}
 						role="img"
-						aria-label={`${label} usage over the last ${config.label}`}
+						aria-label={`${name} over the last ${config.label}`}
 					>
 						{[0, 25, 50, 75, 100].map((tick) => (
 							<g key={tick}>
@@ -197,7 +220,8 @@ export function PerformanceChart() {
 									strokeDasharray={tick === 0 ? undefined : "2 6"}
 								/>
 								<text x={PADDING.left + innerWidth + 8} y={y(tick) + 4} fontSize="11" fontFamily="var(--font-space-mono)" fill="var(--ink)" className="tabular">
-									{tick}%
+									{tick}
+									{unit}
 								</text>
 							</g>
 						))}
@@ -206,7 +230,7 @@ export function PerformanceChart() {
 							<text
 								key={`${index}-${position}`}
 								x={x(index)}
-								y={HEIGHT - 8}
+								y={height - 8}
 								fontSize="11"
 								fontFamily="var(--font-space-mono)"
 								fill="var(--ink)"
@@ -283,10 +307,11 @@ export function PerformanceChart() {
 								<>
 									<p className="mt-1 text-2xl font-bold tabular">
 										{hovered.avg.toFixed(1)}
-										<span className="ml-1 font-mono text-xs">% AVG</span>
+										<span className="ml-1 font-mono text-xs">{unit} AVG</span>
 									</p>
 									<p className="font-mono text-xs tabular">
-										{hovered.min?.toFixed(1)}–{hovered.max?.toFixed(1)}% · {hovered.summary?.totalSamples} SAMPLES
+										{hovered.min?.toFixed(1)}–{hovered.max?.toFixed(1)}
+										{unit} · {hovered.summary?.totalSamples} SAMPLES
 									</p>
 								</>
 							) : (
@@ -297,7 +322,11 @@ export function PerformanceChart() {
 				</AnimatePresence>
 
 				{history.data && measured.length === 0 ? (
-					<div className="label absolute inset-0 grid place-items-center text-muted">Collecting data — the chart fills in as samples arrive</div>
+					<div className="label absolute inset-0 grid place-items-center px-6 text-center text-muted">
+						{metric === "temp" && history.data.summaries.length > 0
+							? "No temperature readings in this period — older samples were recorded before temperature history existed, or this machine has no sensor"
+							: "Collecting data — the chart fills in as samples arrive"}
+					</div>
 				) : null}
 			</div>
 		</Card>

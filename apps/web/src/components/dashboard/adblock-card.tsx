@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { RefreshCw, ShieldCheck, ShieldOff, ShieldQuestion, Timer } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useAuth } from "@/components/auth/auth-provider";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -230,17 +231,23 @@ function Countdown({ status, onElapsed }: { status: AdBlockerStatus; onElapsed: 
 }
 
 function NotConfigured() {
+	const { isAdmin } = useAuth();
+
 	return (
 		<motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-5 border-2 border-dashed border-ink bg-ground/60 p-4">
 			<p className="flex items-center gap-2 text-sm font-bold uppercase">
 				<span className="led bg-ground" /> Pi-hole not connected
 			</p>
 			<p className="mt-1.5 font-mono text-xs leading-5 text-muted">
-				Add your Pi-hole address and app password to control network-wide ad blocking from here.
+				{isAdmin
+					? "Add your Pi-hole address and app password to control network-wide ad blocking from here."
+					: "An administrator can connect Pi-hole in Settings."}
 			</p>
-			<Link href="/settings#pihole" className={buttonStyles("primary", "sm", "mt-3")}>
-				Connect Pi-hole
-			</Link>
+			{isAdmin ? (
+				<Link href="/settings#pihole" className={buttonStyles("primary", "sm", "mt-3")}>
+					Connect Pi-hole
+				</Link>
+			) : null}
 		</motion.div>
 	);
 }

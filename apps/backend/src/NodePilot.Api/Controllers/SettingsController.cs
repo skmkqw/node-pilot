@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using NodePilot.Api.Auth;
 using NodePilot.Application.AdBlocking;
 using NodePilot.Application.AdBlocking.Errors;
 using NodePilot.Application.AdBlocking.Settings;
@@ -6,8 +8,9 @@ using NodePilot.Application.Interfaces.AdBlocking;
 
 namespace NodePilot.Api.Controllers;
 
-/// <summary>Settings that can be changed from the NodePilot interface.</summary>
+/// <summary>Settings that can be changed from the NodePilot interface (administrators only).</summary>
 [Route("api/settings")]
+[Authorize(Policy = AuthenticationExtensions.AdminPolicy)]
 public class SettingsController : BaseController
 {
     private readonly IPiHoleSettingsStore _piHoleSettings;

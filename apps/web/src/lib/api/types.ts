@@ -8,6 +8,7 @@ export type SystemMetric = {
 	cpuUsagePercent: number | null;
 	ramEnabled: boolean;
 	ramUsagePercent: number | null;
+	cpuTemperatureCelsius: number | null;
 	status: MetricCollectionStatus;
 	totalReads: number;
 	successfulReads: number;
@@ -25,6 +26,7 @@ export type IntervalMetricsSummary = {
 	cpuCoveragePercent: number;
 	ramMeasuredSamples: number;
 	ramCoveragePercent: number;
+	temperatureMeasuredSamples: number;
 	intervalStart: string;
 	intervalEnd: string;
 	intervalDurationSeconds: number;
@@ -34,6 +36,9 @@ export type IntervalMetricsSummary = {
 	averageRamUsagePercent: number | null;
 	minRamUsagePercent: number | null;
 	maxRamUsagePercent: number | null;
+	averageCpuTemperatureCelsius: number | null;
+	minCpuTemperatureCelsius: number | null;
+	maxCpuTemperatureCelsius: number | null;
 };
 
 export type MemoryInfo = {
@@ -110,14 +115,47 @@ export type AdBlockerStatus = {
 	checkedAtUtc: string;
 };
 
+export type UserRole = "Admin" | "Member";
+
 export type CurrentUser = {
 	username: string;
+	role: UserRole;
 };
 
 export type AuthStatus = {
 	setupRequired: boolean;
 	authenticated: boolean;
 	username: string | null;
+	role: UserRole | null;
+};
+
+export type UserSummary = {
+	id: number;
+	username: string;
+	role: UserRole;
+	createdAtUtc: string;
+};
+
+export type InvitationSummary = {
+	id: number;
+	role: UserRole;
+	createdBy: string;
+	createdAtUtc: string;
+	expiresAtUtc: string;
+};
+
+/** Returned once on creation; the token cannot be retrieved again. */
+export type CreatedInvitation = {
+	id: number;
+	token: string;
+	role: UserRole;
+	expiresAtUtc: string;
+};
+
+export type InvitationPreview = {
+	role: UserRole;
+	invitedBy: string;
+	expiresAtUtc: string;
 };
 
 export type PiHoleSettingsSource = "None" | "App" | "Environment";

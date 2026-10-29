@@ -30,7 +30,11 @@ public class AuthController : BaseController
         bool setupRequired = await _accounts.IsSetupRequiredAsync(ct);
         bool authenticated = !setupRequired && User.Identity?.IsAuthenticated == true;
 
-        return Ok(new AuthStatusResponse(setupRequired, authenticated, authenticated ? User.Identity!.Name : null));
+        return Ok(new AuthStatusResponse(
+            setupRequired,
+            authenticated,
+            authenticated ? User.Identity!.Name : null,
+            authenticated ? User.FindFirstValue(ClaimTypes.Role) : null));
     }
 
     /// <summary>Creates the administrator account. Only possible while no account exists.</summary>
@@ -48,7 +52,7 @@ public class AuthController : BaseController
 
         await SignInAsync(result.Value, isPersistent: true);
 
-        return StatusCode(StatusCodes.Status201Created, new CurrentUserResponse(result.Value.Username));
+        return StatusCode(StatusCodes.Status201Created, CurrentUserResponse.From(result.Value));
     }
 
     [AllowAnonymous]
@@ -65,7 +69,7 @@ public class AuthController : BaseController
 
         await SignInAsync(result.Value, request.RememberMe);
 
-        return Ok(new CurrentUserResponse(result.Value.Username));
+        return Ok(CurrentUserResponse.From(result.Value));
     }
 
     [AllowAnonymous]
@@ -80,13 +84,13 @@ public class AuthController : BaseController
     [HttpGet("me")]
     public IActionResult GetCurrentUser()
     {
-        return Ok(new CurrentUserResponse(User.Identity?.Name ?? string.Empty));
+        return Ok(new CurrentUserResponse(User.Identity?.Name ?? string.Empty, User.FindFirstValue(ClaimTypes.Role) ?? string.Empty));
     }
 
     [HttpPost("password")]
     public async Task<IActionResult> ChangePasswordAsync([FromBody] ChangePasswordRequest request, CancellationToken ct)
     {
-        if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int accountId))
+        if (User.GetUserId() is not int accountId)
         {
             return Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Please sign in again.");
         }
@@ -96,20 +100,8 @@ public class AuthController : BaseController
         return result.Match(_ => NoContent(), Problem);
     }
 
-    private Task SignInAsync(UserAccount account, bool isPersistent)
-    {
-        var identity = new ClaimsIdentity(
-            [
-                new Claim(ClaimTypes.NameIdentifier, account.Id.ToString()),
-                new Claim(ClaimTypes.Name, account.Username),
-            ],
-            CookieAuthenticationDefaults.AuthenticationScheme);
-
-        return HttpContext.SignInAsync(
-            CookieAuthenticationDefaults.AuthenticationScheme,
-            new ClaimsPrincipal(identity),
-            new AuthenticationProperties { IsPersistent = isPersistent });
-    }
+    private Task SignInAsync(UserAccount account, bool isPersistent) =>
+        HttpContext.SignInAsAsync(account, isPersistent);
 }
 
 public sealed record CredentialsRequest(string? Username, string? Password);
@@ -118,6 +110,9 @@ public sealed record LoginRequest(string? Username, string? Password, bool Remem
 
 public sealed record ChangePasswordRequest(string? CurrentPassword, string? NewPassword);
 
-public sealed record CurrentUserResponse(string Username);
+public sealed record CurrentUserResponse(string Username, string Role)
+{
+    public static CurrentUserResponse From(UserAccount account) => new(account.Username, account.Role.ToString());
+}
 
-public sealed record AuthStatusResponse(bool SetupRequired, bool Authenticated, string? Username);
+public sealed record AuthStatusResponse(bool SetupRequired, bool Authenticated, string? Username, string? Role);

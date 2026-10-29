@@ -17,7 +17,7 @@ The service only supports Linux. If the application runs on a different operatin
 
 There are three metrics flows:
 
-1. `MetricsSamplingBackgroundService` collects and persists a CPU/RAM sample every `Monitoring:Collection:IntervalSeconds` (default 15 s).
+1. `MetricsSamplingBackgroundService` collects and persists a CPU/RAM/temperature sample every `Monitoring:Collection:IntervalSeconds` (default 15 s).
 2. `GET /api/system/metrics/current` and `GET /api/system/metrics/historical` read the persisted samples.
 3. `GET /api/system/overview` reads live, non-persisted host information on demand (uptime, load average, memory, CPU temperature, disk usage). See `SystemOverviewProvider`.
 
@@ -57,6 +57,7 @@ Background samples are stored as `SystemMetric` rows in the `system_metrics` tab
 - `Id` / `id`: Database-generated primary key.
 - `CpuUsagePercent` / `cpu_usage_percent`: CPU usage percent for a successful read, or `NULL` for a failed read.
 - `RamUsagePercent` / `ram_usage_percent`: RAM usage percent for a successful read, or `NULL` for a failed read.
+- `CpuTemperatureCelsius` / `cpu_temperature_celsius`: CPU temperature in °C (one decimal), read with the same sensor selection as `GET /api/system/overview`. `NULL` when no sensor exists or `CollectTemperature` is off. It is **not** counted in `total_reads`/`successful_reads`: many machines (VMs, containers) have no sensor, and that should not turn every sample into a partial failure.
 - `Status` / `status`: Collection result stored as an integer enum.
 - `FailureReason` / `failure_reason`: Error code for a failed read, capped at 500 characters, or `NULL` for success.
 - `CollectedAtUtc` / `collected_at_utc`: UTC timestamp captured when the collector started the sample.
@@ -72,6 +73,9 @@ The database enforces the expected row shape:
 - successful rows must have CPU and RAM values and no failure reason
 - failed rows must have no CPU or RAM values and must have a failure reason
 - CPU and RAM percentages must be `NULL` or within `0..100`
+- the temperature must be `NULL` or within `-40..150` °C
+
+Historical summaries add `temperatureMeasuredSamples` and `average/min/maxCpuTemperatureCelsius` per bucket. Samples stored before migration `AddCpuTemperatureHistory` have no temperature.
 
 ## Metrics API endpoints
 

@@ -23,6 +23,8 @@ public sealed class IntervalMetricsSummary
             ? 0
             : Math.Round((double)RamMeasuredSamples / TotalSamples * 100, 2);
 
+    public int TemperatureMeasuredSamples { get; private set; }
+
     public DateTimeOffset IntervalStart { get; init; }
     public DateTimeOffset IntervalEnd { get; init; }
     public int IntervalDurationSeconds => (int)(IntervalEnd - IntervalStart).TotalSeconds;
@@ -34,6 +36,10 @@ public sealed class IntervalMetricsSummary
     public double? AverageRamUsagePercent { get; init; }
     public double? MinRamUsagePercent { get; private set; }
     public double? MaxRamUsagePercent { get; private set; }
+
+    public double? AverageCpuTemperatureCelsius { get; init; }
+    public double? MinCpuTemperatureCelsius { get; private set; }
+    public double? MaxCpuTemperatureCelsius { get; private set; }
 
     public IntervalMetricsSummary(MetricsBucket bucket)
     {
@@ -51,6 +57,7 @@ public sealed class IntervalMetricsSummary
 
         double accumulatedCpuUsagePercent = 0;
         double accumulatedRamUsagePercent = 0;
+        double accumulatedTemperatureCelsius = 0;
 
         foreach (var sample in samples)
         {
@@ -100,6 +107,22 @@ public sealed class IntervalMetricsSummary
                     ? ramUsage
                     : Math.Max(MaxRamUsagePercent.Value, ramUsage);
             }
+
+            if (sample.CpuTemperatureCelsius.HasValue)
+            {
+                TemperatureMeasuredSamples++;
+
+                double temperature = sample.CpuTemperatureCelsius.Value;
+                accumulatedTemperatureCelsius += temperature;
+
+                MinCpuTemperatureCelsius = MinCpuTemperatureCelsius is null
+                    ? temperature
+                    : Math.Min(MinCpuTemperatureCelsius.Value, temperature);
+
+                MaxCpuTemperatureCelsius = MaxCpuTemperatureCelsius is null
+                    ? temperature
+                    : Math.Max(MaxCpuTemperatureCelsius.Value, temperature);
+            }
         }
 
         AverageCpuUsagePercent =
@@ -110,6 +133,11 @@ public sealed class IntervalMetricsSummary
         AverageRamUsagePercent =
             RamMeasuredSamples > 0
                 ? Math.Round(accumulatedRamUsagePercent / RamMeasuredSamples, 2)
+                : null;
+
+        AverageCpuTemperatureCelsius =
+            TemperatureMeasuredSamples > 0
+                ? Math.Round(accumulatedTemperatureCelsius / TemperatureMeasuredSamples, 1)
                 : null;
     }
 }

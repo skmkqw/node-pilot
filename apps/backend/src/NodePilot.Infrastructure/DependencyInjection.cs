@@ -36,6 +36,7 @@ public static class DependencyInjection
 
         services.AddScoped<ISystemMetricsRepository, SystemMetricsRepository>();
         services.AddScoped<IUserAccountRepository, UserAccountRepository>();
+        services.AddScoped<IInvitationRepository, InvitationRepository>();
         services.AddScoped<IAppSettingsRepository, AppSettingsRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "motion/react";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
@@ -81,11 +80,11 @@ export function MetricMeter({
 			<div className="grid grid-cols-10 gap-[3px]" role="meter" aria-label={label} aria-valuenow={percent ?? undefined} aria-valuemin={0} aria-valuemax={100}>
 				{Array.from({ length: SEGMENTS }).map((_, index) => (
 					<span key={index} className="relative h-3.5 border-[1.5px] border-ink">
-						<motion.span
-							className="absolute inset-0 bg-ink"
-							initial={false}
-							animate={{ opacity: index < lit ? 1 : 0 }}
-							transition={{ duration: 0.08, delay: index < lit ? index * 0.045 : (SEGMENTS - index) * 0.02 }}
+						{/* A CSS transition always settles on the current value; a JS animation
+						    interrupted mid-sweep (e.g. in a background tab) could leave stray segments lit. */}
+						<span
+							className={cn("absolute inset-0 bg-ink transition-opacity duration-75", index < lit ? "opacity-100" : "opacity-0")}
+							style={{ transitionDelay: `${index < lit ? index * 45 : (SEGMENTS - index) * 20}ms` }}
 						/>
 					</span>
 				))}

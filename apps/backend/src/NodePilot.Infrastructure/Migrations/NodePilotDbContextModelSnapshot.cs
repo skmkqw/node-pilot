@@ -17,6 +17,58 @@ namespace NodePilot.Infrastructure.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.6");
 
+            modelBuilder.Entity("NodePilot.Application.Accounts.Models.Invitation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("AcceptedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("accepted_at_utc");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<int>("CreatedByUserId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("role");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("token_hash")
+                        .IsFixedLength();
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_invitations_token_hash");
+
+                    b.ToTable("invitations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_invitations_expires_after_created", "expires_at_utc > created_at_utc");
+
+                            t.HasCheckConstraint("ck_invitations_role", "role IN ('Admin', 'Member')");
+                        });
+                });
+
             modelBuilder.Entity("NodePilot.Application.Accounts.Models.UserAccount", b =>
                 {
                     b.Property<int>("Id")
@@ -38,6 +90,12 @@ namespace NodePilot.Infrastructure.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("password_hash");
 
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("role");
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -51,7 +109,10 @@ namespace NodePilot.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_users_username");
 
-                    b.ToTable("users", (string)null);
+                    b.ToTable("users", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_users_role", "role IN ('Admin', 'Member')");
+                        });
                 });
 
             modelBuilder.Entity("NodePilot.Application.Monitoring.Models.SystemMetric", b =>
@@ -68,6 +129,10 @@ namespace NodePilot.Infrastructure.Migrations
                     b.Property<bool>("CpuEnabled")
                         .HasColumnType("INTEGER")
                         .HasColumnName("cpu_enabled");
+
+                    b.Property<double?>("CpuTemperatureCelsius")
+                        .HasColumnType("REAL")
+                        .HasColumnName("cpu_temperature_celsius");
 
                     b.Property<double?>("CpuUsagePercent")
                         .HasColumnType("REAL")
@@ -110,6 +175,8 @@ namespace NodePilot.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("ck_system_metrics_cpu_disabled_has_no_value", "cpu_enabled OR cpu_usage_percent IS NULL");
 
+                            t.HasCheckConstraint("ck_system_metrics_cpu_temperature_range", "cpu_temperature_celsius IS NULL OR (cpu_temperature_celsius >= -40 AND cpu_temperature_celsius <= 150)");
+
                             t.HasCheckConstraint("ck_system_metrics_cpu_usage_percent_range", "cpu_usage_percent IS NULL OR (cpu_usage_percent >= 0 AND cpu_usage_percent <= 100)");
 
                             t.HasCheckConstraint("ck_system_metrics_partial_success_shape", "(status != 1 OR (successful_reads > 0 AND successful_reads < total_reads AND failure_reason IS NOT NULL))");
@@ -148,6 +215,17 @@ namespace NodePilot.Infrastructure.Migrations
                     b.HasKey("Key");
 
                     b.ToTable("app_settings", (string)null);
+                });
+
+            modelBuilder.Entity("NodePilot.Application.Accounts.Models.Invitation", b =>
+                {
+                    b.HasOne("NodePilot.Application.Accounts.Models.UserAccount", "CreatedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreatedBy");
                 });
 #pragma warning restore 612, 618
         }

@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { UNAUTHORIZED_EVENT } from "@/lib/api/client";
-import { authApi } from "@/lib/api/endpoints";
+import { authApi, invitationsApi } from "@/lib/api/endpoints";
 import type { CurrentUser } from "@/lib/api/types";
 
 /**
@@ -14,8 +14,10 @@ type AuthState = "loading" | "setup" | "anonymous" | "authenticated" | "offline"
 type AuthContextValue = {
 	status: AuthState;
 	user: CurrentUser | null;
+	isAdmin: boolean;
 	login: (username: string, password: string, rememberMe: boolean) => Promise<void>;
 	setup: (username: string, password: string) => Promise<void>;
+	acceptInvite: (token: string, username: string, password: string) => Promise<void>;
 	logout: () => Promise<void>;
 	retry: () => void;
 };
@@ -36,8 +38,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				if (current.setupRequired) {
 					setUser(null);
 					setStatus("setup");
-				} else if (current.authenticated && current.username) {
-					setUser({ username: current.username });
+				} else if (current.authenticated && current.username && current.role) {
+					setUser({ username: current.username, role: current.role });
 					setStatus("authenticated");
 				} else {
 					setUser(null);
@@ -75,6 +77,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 		setStatus("authenticated");
 	}, []);
 
+	const acceptInvite = useCallback(async (token: string, username: string, password: string) => {
+		const current = await invitationsApi.accept(token, username, password);
+		setUser(current);
+		setStatus("authenticated");
+	}, []);
+
 	const logout = useCallback(async () => {
 		try {
 			await authApi.logout();
@@ -90,8 +98,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	}, []);
 
 	const value = useMemo(
-		() => ({ status, user, login, setup, logout, retry }),
-		[status, user, login, setup, logout, retry],
+		() => ({ status, user, isAdmin: user?.role === "Admin", login, setup, acceptInvite, logout, retry }),
+		[status, user, login, setup, acceptInvite, logout, retry],
 	);
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

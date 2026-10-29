@@ -80,7 +80,7 @@ The very first time you open NodePilot you see **Welcome to NodePilot**:
 ### 2. Dashboard: is my server OK?
 
 - **Four channel cards** (CPU, Memory, Thermal, Disk) show live readings. The square lamp is **green** when everything is fine, **saffron** when a value is elevated, and **blinking red** when it needs attention; that card also turns saffron, and the headline counts the warnings.
-- **Performance** shows CPU or memory over the last 15 minutes up to 24 hours. Hover (or tap) the chart to see the exact value at that time.
+- **Performance** shows CPU, memory or CPU temperature (**TEMP**) over the last 15 minutes up to 24 hours. Hover (or tap) the chart to see the exact value at that time.
 - **Ad blocker** shows how many requests Pi-hole blocked today. Flip the **I/O switch** to turn blocking off or on, or press **5 min / 30 min / 1 h** to pause it; it switches itself back on when the countdown ends.
 - **Host** shows the server name, uptime and load.
 
@@ -93,12 +93,33 @@ The very first time you open NodePilot you see **Welcome to NodePilot**:
 
 NodePilot only shows one folder on the server (by default `apps/backend/src/NodePilot.Api/data/files`, or `NODEPILOT_FILES_DIR` with Docker). It cannot reach anything outside it.
 
-### 4. Settings
+### 4. Users: invite your household (admins)
+
+NodePilot has two roles:
+
+| | Admin | Member |
+|---|:-:|:-:|
+| Dashboard, Files & Media, ad-blocking switch | ✓ | ✓ |
+| Change own password | ✓ | ✓ |
+| Invite and manage users | ✓ | – |
+| Connect Pi-hole | ✓ | – |
+
+To add someone:
+
+1. Open **Users** and choose the role and how long the link stays valid (**1 h**, **24 h** or **7 days**).
+2. Press **Create invite link**, then **Copy** (or **Share** on a phone) and send it to them.
+3. They open the link, pick their own username and password, and are signed in.
+
+Each link works **once**. Unused links are listed below the form and can be **revoked**. In the **Accounts** list you can make someone an admin or a member, or remove them; a removed user is signed out on every device immediately. You can't remove or demote yourself, so there is always at least one admin.
+
+> Invite links go to the address you are using, e.g. `http://192.168.1.20:3000/invite/…`. Create them from the server's network address (not `localhost`) if they'll be opened on another device.
+
+### 5. Settings
 
 - **Account:** change your password.
-- **Ad blocker (Pi-hole):** connect, re-test or disconnect Pi-hole. The password is stored encrypted and is never shown again; leave the field empty to keep it.
+- **Ad blocker (Pi-hole)** (admins): connect, re-test or disconnect Pi-hole. The password is stored encrypted and is never shown again; leave the field empty to keep it.
 
-### 5. Signing out
+### 6. Signing out
 
 Use the **exit icon** at the bottom of the sidebar (top right on a phone). With **Keep me signed in** checked, you stay signed in for a week on that device.
 
@@ -192,7 +213,7 @@ cd apps/backend
 dotnet test
 ```
 
-The suite has unit tests (path traversal protection, symlink escapes, Linux parsers, CORS policy, Pi-hole client against a fake API, UTC bucketing) and integration tests that host the real API in memory (authentication, file upload / range streaming / delete, access control).
+The suite has unit tests (path traversal protection, symlink escapes, Linux parsers, CORS policy, Pi-hole client against a fake API, UTC bucketing, invite links) and integration tests that host the real API in memory (authentication, file upload / range streaming / delete, invite flow, admin/member access control).
 
 ```bash
 cd apps/web
@@ -202,7 +223,9 @@ npm run build
 
 ## Security notes
 
-- All `/api/*` endpoints require a signed-in user; only `/health` is public.
+- All `/api/*` endpoints require a signed-in user; only `/health`, sign-in/setup and the invite page's own endpoints are public. User management and Pi-hole settings require the Admin role.
+- Invite links carry a 256-bit random token; only its SHA-256 hash is stored, each link works once and expires after at most 7 days.
+- Every request re-checks that the account still exists, so removing a user ends their sessions at once.
 - Sessions use an HTTP-only, `SameSite=Lax` cookie; login is limited to 5 attempts per minute per IP.
 - The file manager is restricted to `FileManager:RootPath`. Paths are normalised and every symlink along a path is resolved, so `..` sequences and links pointing outside the root are rejected (403).
 - NodePilot does not execute shell commands.

@@ -10,5 +10,9 @@ public interface IUserAccountRepository
 
     Task<UserAccount?> GetByUsernameAsync(string username, CancellationToken ct = default);
 
+    Task<IReadOnlyList<UserAccount>> ListAsync(CancellationToken ct = default);
+
     Task AddAsync(UserAccount account, CancellationToken ct = default);
+
+    void Remove(UserAccount account);
 }
