@@ -122,6 +122,7 @@ npm run build
 
 ## Documentation
 
+- [Feature documentation](documents/features/README.md): one document per module (user and developer perspective)
 - [API reference](documents/api.md)
 - [System metrics collection](documents/system-metrics.md)
 - [UI mockups](documents/mockups)
