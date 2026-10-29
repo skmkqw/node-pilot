@@ -63,6 +63,45 @@ NodePilot is a client–server application: the **backend** (ASP.NET Core, port 
 | Phone: "This site can't be reached" | Use the USB cable, or check that the phone is on the same Wi-Fi and has no VPN active. |
 | Forgot the password | Stop NodePilot, delete `apps/backend/src/NodePilot.Api/data/nodepilot.db` (this also removes the metric history) and start again to get the setup screen. |
 
+## Using NodePilot
+
+A short tour for everyday use. Everything below works the same on a computer and on a phone.
+
+### 1. First start: create your account
+
+The very first time you open NodePilot you see **Welcome to NodePilot**:
+
+1. **Create the administrator account.** Pick a username and a password (at least 8 characters; the bar below the field shows how strong it is). You'll use this account to sign in from any device.
+2. **Connect your Pi-hole (optional).** If you use [Pi-hole](https://pi-hole.net/) for ad blocking, enter its address (e.g. `http://192.168.1.2`) and its *app password*, press **Test connection**, then **Save**. No Pi-hole? Press **Skip for now**.
+3. Press **Open dashboard**. That's it.
+
+> Do the setup right after installing: until an account exists, anyone on your network who opens the page could create it.
+
+### 2. Dashboard: is my server OK?
+
+- **Four channel cards** (CPU, Memory, Thermal, Disk) show live readings. The square lamp is **green** when everything is fine, **saffron** when a value is elevated, and **blinking red** when it needs attention; that card also turns saffron, and the headline counts the warnings.
+- **Performance** shows CPU or memory over the last 15 minutes up to 24 hours. Hover (or tap) the chart to see the exact value at that time.
+- **Ad blocker** shows how many requests Pi-hole blocked today. Flip the **I/O switch** to turn blocking off or on, or press **5 min / 30 min / 1 h** to pause it; it switches itself back on when the countdown ends.
+- **Host** shows the server name, uptime and load.
+
+### 3. Files & Media: your files and videos
+
+- Click a **folder** to open it; use the path bar at the top to go back.
+- **Upload:** press **Upload**, or simply **drag files onto the page**. A progress panel shows each upload.
+- **Watch a video:** click it (or the ▶ button). Videos play right in the browser and you can jump anywhere in them. Use the ← → arrows to go to the next one. MP4 and WebM work everywhere; some other formats depend on the browser.
+- **Download** with the ↓ button, **delete** with the bin (you'll be asked to confirm), and create folders with **New folder**.
+
+NodePilot only shows one folder on the server (by default `apps/backend/src/NodePilot.Api/data/files`, or `NODEPILOT_FILES_DIR` with Docker). It cannot reach anything outside it.
+
+### 4. Settings
+
+- **Account:** change your password.
+- **Ad blocker (Pi-hole):** connect, re-test or disconnect Pi-hole. The password is stored encrypted and is never shown again; leave the field empty to keep it.
+
+### 5. Signing out
+
+Use the **exit icon** at the bottom of the sidebar (top right on a phone). With **Keep me signed in** checked, you stay signed in for a week on that device.
+
 ## Monorepo structure
 
 ```text
