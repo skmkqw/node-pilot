@@ -17,13 +17,14 @@ const item = {
 };
 
 export default function SettingsPage() {
-	const { user } = useAuth();
-	// Loaded once; the form keeps its own state while editing.
-	const piHole = usePolling((signal) => settingsApi.piHole(signal), 10 * 60_000);
+	const { user, isAdmin } = useAuth();
 
 	return (
 		<>
-			<PageHeader title="Settings" description="Your account and the services NodePilot connects to." />
+			<PageHeader
+				title="Settings"
+				description={isAdmin ? "Your account and the services NodePilot connects to." : "Your account. Services are managed by an administrator."}
+			/>
 
 			<motion.div variants={container} initial="hidden" animate="show" className="grid items-start gap-5 sm:gap-6 xl:grid-cols-2">
 				<Card className="p-5 sm:p-6" variants={item}>
@@ -31,43 +32,57 @@ export default function SettingsPage() {
 						icon={<UserCog className="size-5" />}
 						channel="CFG-01"
 						title="Account"
-						subtitle={<>SIGNED IN AS <span className="font-bold text-ink">{user?.username}</span></>}
+						subtitle={
+							<>
+								SIGNED IN AS <span className="font-bold text-ink">{user?.username}</span> · {user?.role.toUpperCase()}
+							</>
+						}
 					/>
 					<div className="mt-6">
 						<ChangePasswordForm />
 					</div>
 				</Card>
 
-				<Card id="pihole" className="scroll-mt-24 p-5 sm:p-6" variants={item}>
-					<CardHeader
-						icon={<ShieldCheck className="size-5" />}
-						channel="CFG-02"
-						title="Ad blocker (Pi-hole)"
-						subtitle={
-							piHole.data?.source === "None"
-								? "NOT CONNECTED"
-								: piHole.data?.baseUrl
-									? `CONNECTED · ${piHole.data.baseUrl}`
-									: "LOADING…"
-						}
-					/>
-					<div className="mt-6">
-						{piHole.data ? (
-							<PiHoleForm
-								key={`${piHole.data.source}-${piHole.data.baseUrl}`}
-								info={piHole.data}
-								onSaved={(info) => piHole.setData(info)}
-								onDisconnected={piHole.refresh}
-							/>
-						) : (
-							<div className="space-y-4">
-								<div className="skeleton h-16" />
-								<div className="skeleton h-16" />
-							</div>
-						)}
-					</div>
-				</Card>
+				{isAdmin ? <PiHoleCard /> : null}
 			</motion.div>
 		</>
+	);
+}
+
+/** Administrators only: the settings API answers 403 to members. */
+function PiHoleCard() {
+	// Loaded once; the form keeps its own state while editing.
+	const piHole = usePolling((signal) => settingsApi.piHole(signal), 10 * 60_000);
+
+	return (
+		<Card id="pihole" className="scroll-mt-24 p-5 sm:p-6" variants={item}>
+			<CardHeader
+				icon={<ShieldCheck className="size-5" />}
+				channel="CFG-02"
+				title="Ad blocker (Pi-hole)"
+				subtitle={
+					piHole.data?.source === "None"
+						? "NOT CONNECTED"
+						: piHole.data?.baseUrl
+							? `CONNECTED · ${piHole.data.baseUrl}`
+							: "LOADING…"
+				}
+			/>
+			<div className="mt-6">
+				{piHole.data ? (
+					<PiHoleForm
+						key={`${piHole.data.source}-${piHole.data.baseUrl}`}
+						info={piHole.data}
+						onSaved={(info) => piHole.setData(info)}
+						onDisconnected={piHole.refresh}
+					/>
+				) : (
+					<div className="space-y-4">
+						<div className="skeleton h-16" />
+						<div className="skeleton h-16" />
+					</div>
+				)}
+			</div>
+		</Card>
 	);
 }
