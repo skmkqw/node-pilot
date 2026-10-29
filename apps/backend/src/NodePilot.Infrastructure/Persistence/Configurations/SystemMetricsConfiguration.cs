@@ -49,6 +49,10 @@ public class SystemMetricsConfiguration : IEntityTypeConfiguration<SystemMetric>
         builder.Property(x => x.RamUsagePercent)
             .HasColumnName("ram_usage_percent");
 
+        // CPU temperature (optional, not part of the read counters)
+        builder.Property(x => x.CpuTemperatureCelsius)
+            .HasColumnName("cpu_temperature_celsius");
+
         // Reads (total and failed)
         builder.Property(x => x.TotalReads)
             .HasColumnName("total_reads")
@@ -102,6 +106,11 @@ public class SystemMetricsConfiguration : IEntityTypeConfiguration<SystemMetric>
         builder.HasCheckConstraint(
             "ck_system_metrics_ram_usage_percent_range",
             "ram_usage_percent IS NULL OR (ram_usage_percent >= 0 AND ram_usage_percent <= 100)");
+
+        // Temperature is NULL OR within what CPU sensors can physically report
+        builder.HasCheckConstraint(
+            "ck_system_metrics_cpu_temperature_range",
+            "cpu_temperature_celsius IS NULL OR (cpu_temperature_celsius >= -40 AND cpu_temperature_celsius <= 150)");
 
         // Valid Success Shape
         builder.HasCheckConstraint(

@@ -130,6 +130,10 @@ namespace NodePilot.Infrastructure.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("cpu_enabled");
 
+                    b.Property<double?>("CpuTemperatureCelsius")
+                        .HasColumnType("REAL")
+                        .HasColumnName("cpu_temperature_celsius");
+
                     b.Property<double?>("CpuUsagePercent")
                         .HasColumnType("REAL")
                         .HasColumnName("cpu_usage_percent");
@@ -170,6 +174,8 @@ namespace NodePilot.Infrastructure.Migrations
                     b.ToTable("system_metrics", null, t =>
                         {
                             t.HasCheckConstraint("ck_system_metrics_cpu_disabled_has_no_value", "cpu_enabled OR cpu_usage_percent IS NULL");
+
+                            t.HasCheckConstraint("ck_system_metrics_cpu_temperature_range", "cpu_temperature_celsius IS NULL OR (cpu_temperature_celsius >= -40 AND cpu_temperature_celsius <= 150)");
 
                             t.HasCheckConstraint("ck_system_metrics_cpu_usage_percent_range", "cpu_usage_percent IS NULL OR (cpu_usage_percent >= 0 AND cpu_usage_percent <= 100)");
 

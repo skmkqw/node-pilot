@@ -42,7 +42,7 @@ public sealed class SystemOverviewProvider : ISystemOverviewProvider
             UptimeSeconds: ReadOptional(_procUptimePath, LinuxSystemParsers.ParseUptimeSeconds),
             LoadAverage: ReadOptional(_procLoadAvgPath, LinuxSystemParsers.ParseLoadAverage),
             Memory: memoryResult.IsError ? null : memoryResult.Value,
-            CpuTemperatureCelsius: settings.CollectTemperature ? ReadCpuTemperature() : null,
+            CpuTemperatureCelsius: settings.CollectTemperature ? ReadCpuTemperatureCelsius() : null,
             Disk: settings.CollectDiskUsage ? ReadDiskUsage(_diskMountPoint) : null,
             CollectedAtUtc: DateTime.UtcNow);
     }
@@ -84,7 +84,7 @@ public sealed class SystemOverviewProvider : ISystemOverviewProvider
         }
     }
 
-    private double? ReadCpuTemperature()
+    public double? ReadCpuTemperatureCelsius()
     {
         var sensors = new List<TemperatureSensor>();
 

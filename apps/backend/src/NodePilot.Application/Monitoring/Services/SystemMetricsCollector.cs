@@ -8,15 +8,18 @@ namespace NodePilot.Application.Monitoring.Services;
 public sealed class LinuxSystemMetricsCollector : ISystemMetricsCollector
 {
     private readonly ISystemMetricsReader _metricsReader;
+    private readonly ISystemOverviewProvider _overviewProvider;
     private readonly IMonitoringSettingsProvider _monitoringSettingsProvider;
     private readonly ILogger<LinuxSystemMetricsCollector> _logger;
 
     public LinuxSystemMetricsCollector(
         ISystemMetricsReader metricsReader,
+        ISystemOverviewProvider overviewProvider,
         IMonitoringSettingsProvider monitoringSettingsProvider,
         ILogger<LinuxSystemMetricsCollector> logger)
     {
         _metricsReader = metricsReader;
+        _overviewProvider = overviewProvider;
         _monitoringSettingsProvider = monitoringSettingsProvider;
         _logger = logger;
     }
@@ -70,6 +73,10 @@ public sealed class LinuxSystemMetricsCollector : ISystemMetricsCollector
             }
         }
 
+        double? temperature = settings.CollectTemperature
+            ? _overviewProvider.ReadCpuTemperatureCelsius() is double celsius ? Math.Round(celsius, 1) : null
+            : null;
+
         var status = DetermineStatus(totalReads, failedReads);
         string? failureReason = errors.Count > 0
             ? BuildFailureReason(errors)
@@ -84,6 +91,7 @@ public sealed class LinuxSystemMetricsCollector : ISystemMetricsCollector
 
             CpuUsagePercent = cpuUsage,
             RamUsagePercent = ramUsage,
+            CpuTemperatureCelsius = temperature,
 
             Status = status,
             TotalReads = totalReads,
