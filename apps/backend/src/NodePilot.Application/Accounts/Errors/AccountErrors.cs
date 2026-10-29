@@ -27,4 +27,16 @@ public static class AccountErrors
     public static Error NotFound => Error.NotFound(
         code: "Accounts.NotFound",
         description: "The account no longer exists.");
+
+    public static Error UsernameTaken => Error.Conflict(
+        code: "Accounts.UsernameTaken",
+        description: "This username is already taken.");
+
+    public static Error CannotModifySelf => Error.Validation(
+        code: "Accounts.CannotModifySelf",
+        description: "You can't remove your own account or change your own role.");
+
+    public static Error InvalidRole => Error.Validation(
+        code: "Accounts.InvalidRole",
+        description: "The role must be Admin or Member.");
 }

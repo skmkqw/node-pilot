@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using NodePilot.Application.Accounts.Services;
 using NodePilot.Application.Files.Services;
 using NodePilot.Application.Interfaces.Accounts;
@@ -20,6 +21,8 @@ public static class DependencyInjection
         services.AddSingleton<ISystemOverviewProvider, SystemOverviewProvider>();
         services.AddSingleton<IFileManagerService, FileManagerService>();
         services.AddScoped<IAccountService, AccountService>();
+        services.AddScoped<IInvitationService, InvitationService>();
+        services.TryAddSingleton(TimeProvider.System);
         return services;
     }
 }

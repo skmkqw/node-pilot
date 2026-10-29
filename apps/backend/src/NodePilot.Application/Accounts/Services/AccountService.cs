@@ -56,7 +56,7 @@ public sealed partial class AccountService : IAccountService
             return AccountErrors.SetupAlreadyCompleted;
         }
 
-        var validation = Validate(username, password);
+        var validation = ValidateNewAccount(username, password);
 
         if (validation.IsError)
         {
@@ -77,6 +77,7 @@ public sealed partial class AccountService : IAccountService
             {
                 Username = username!.Trim(),
                 PasswordHash = _passwordHasher.Hash(password!),
+                Role = UserRole.Admin,
                 CreatedAtUtc = now,
                 PasswordChangedAtUtc = now,
             };
@@ -151,6 +152,66 @@ public sealed partial class AccountService : IAccountService
         return Result.Success;
     }
 
+    public async Task<IReadOnlyList<UserSummary>> ListUsersAsync(CancellationToken ct = default)
+    {
+        var accounts = await _accounts.ListAsync(ct);
+
+        return accounts.Select(ToSummary).ToList();
+    }
+
+    public async Task<ErrorOr<Deleted>> RemoveUserAsync(int actingUserId, int userId, CancellationToken ct = default)
+    {
+        // Not being able to remove yourself also guarantees that at least one administrator remains.
+        if (actingUserId == userId)
+        {
+            return AccountErrors.CannotModifySelf;
+        }
+
+        var account = await _accounts.GetByIdAsync(userId, ct);
+
+        if (account is null)
+        {
+            return AccountErrors.NotFound;
+        }
+
+        _accounts.Remove(account);
+        await _unitOfWork.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Account '{Username}' removed by user {ActingUserId}.", account.Username, actingUserId);
+
+        return Result.Deleted;
+    }
+
+    public async Task<ErrorOr<UserSummary>> ChangeRoleAsync(int actingUserId, int userId, UserRole role, CancellationToken ct = default)
+    {
+        if (!Enum.IsDefined(role))
+        {
+            return AccountErrors.InvalidRole;
+        }
+
+        if (actingUserId == userId)
+        {
+            return AccountErrors.CannotModifySelf;
+        }
+
+        var account = await _accounts.GetByIdAsync(userId, ct);
+
+        if (account is null)
+        {
+            return AccountErrors.NotFound;
+        }
+
+        account.Role = role;
+        await _unitOfWork.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Account '{Username}' is now {Role} (changed by user {ActingUserId}).", account.Username, role, actingUserId);
+
+        return ToSummary(account);
+    }
+
+    public static UserSummary ToSummary(UserAccount account) =>
+        new(account.Id, account.Username, account.Role, account.CreatedAtUtc);
+
     public static bool IsValidUsername(string? username)
     {
         return username is not null && UsernamePattern().IsMatch(username.Trim());
@@ -162,7 +223,8 @@ public sealed partial class AccountService : IAccountService
             && !string.IsNullOrWhiteSpace(password);
     }
 
-    private static ErrorOr<Success> Validate(string? username, string? password)
+    /// <summary>Rules for a new account's username and password (setup and invitations).</summary>
+    public static ErrorOr<Success> ValidateNewAccount(string? username, string? password)
     {
         var errors = new List<Error>();
 
