@@ -34,7 +34,7 @@ export default function SettingsPage() {
 						title="Account"
 						subtitle={
 							<>
-								SIGNED IN AS <span className="font-bold text-ink">{user?.username}</span> · {user?.role.toUpperCase()}
+								SIGNED IN AS <span className="font-bold text-ink">{user?.username}</span> · {user?.role?.toUpperCase()}
 							</>
 						}
 					/>
