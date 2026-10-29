@@ -17,7 +17,12 @@ import { invitationsApi } from "@/lib/api/endpoints";
 import type { InvitationPreview } from "@/lib/api/types";
 import { formatRelative } from "@/lib/format";
 
-type PreviewState = { kind: "loading" } | { kind: "valid"; preview: InvitationPreview } | { kind: "invalid" } | { kind: "offline" };
+type PreviewState =
+	| { kind: "loading" }
+	| { kind: "valid"; preview: InvitationPreview }
+	| { kind: "invalid" }
+	| { kind: "error"; message: string }
+	| { kind: "offline" };
 
 export default function InvitePage() {
 	const { token } = useParams<{ token: string }>();
@@ -32,22 +37,22 @@ export default function InvitePage() {
 			.then((preview) => setState({ kind: "valid", preview }))
 			.catch((error: unknown) => {
 				if (error instanceof DOMException && error.name === "AbortError") return;
-				setState({ kind: error instanceof ApiError && error.status !== 0 ? "invalid" : "offline" });
+				// Only 404 means the link itself is bad; anything else (e.g. 429) is worth retrying.
+				if (error instanceof ApiError && error.status === 404) setState({ kind: "invalid" });
+				else if (error instanceof ApiError && error.status !== 0) setState({ kind: "error", message: error.message });
+				else setState({ kind: "offline" });
 			});
 
 		return () => controller.abort();
 	}, [token, attempt]);
 
 	if (state.kind === "loading") return <Splash message="Checking invite…" />;
-	if (state.kind === "offline")
-		return (
-			<OfflineScreen
-				onRetry={() => {
-					setState({ kind: "loading" });
-					setAttempt((value) => value + 1);
-				}}
-			/>
-		);
+	const retry = () => {
+		setState({ kind: "loading" });
+		setAttempt((value) => value + 1);
+	};
+
+	if (state.kind === "offline") return <OfflineScreen onRetry={retry} />;
 
 	return (
 		<div className="grid min-h-screen place-items-center px-4 py-10">
@@ -66,7 +71,9 @@ export default function InvitePage() {
 				</div>
 
 				<div className="panel p-6 sm:p-8">
-					{state.kind === "valid" ? <AcceptForm token={token} preview={state.preview} /> : <InvalidLink />}
+					{state.kind === "valid" ? <AcceptForm token={token} preview={state.preview} /> : null}
+					{state.kind === "invalid" ? <InvalidLink /> : null}
+					{state.kind === "error" ? <LoadError message={state.message} onRetry={retry} /> : null}
 				</div>
 			</motion.div>
 		</div>
@@ -151,6 +158,18 @@ function AcceptForm({ token, preview }: { token: string; preview: InvitationPrev
 				{!isSubmitting ? <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" /> : null}
 			</Button>
 		</form>
+	);
+}
+
+function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+	return (
+		<div className="flex flex-col items-center py-2 text-center">
+			<h2 className="text-2xl font-bold uppercase">Couldn&apos;t open the invite</h2>
+			<p className="mt-2 max-w-sm font-mono text-xs leading-5 text-muted">{message}</p>
+			<Button variant="secondary" className="mt-7" onClick={onRetry}>
+				Try again
+			</Button>
+		</div>
 	);
 }
 
