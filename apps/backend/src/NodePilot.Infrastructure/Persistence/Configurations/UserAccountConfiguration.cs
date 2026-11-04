@@ -8,7 +8,8 @@ public class UserAccountConfiguration : IEntityTypeConfiguration<UserAccount>
 {
     public void Configure(EntityTypeBuilder<UserAccount> builder)
     {
-        builder.ToTable("users");
+        builder.ToTable("users", table =>
+            table.HasCheckConstraint("ck_users_role", "role IN ('Admin', 'Member')"));
 
         builder.HasKey(x => x.Id);
 
@@ -37,8 +38,6 @@ public class UserAccountConfiguration : IEntityTypeConfiguration<UserAccount>
             .HasConversion<string>()
             .HasMaxLength(16)
             .IsRequired();
-
-        builder.HasCheckConstraint("ck_users_role", "role IN ('Admin', 'Member')");
 
         builder.Property(x => x.CreatedAtUtc)
             .HasColumnName("created_at_utc")
