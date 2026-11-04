@@ -6,7 +6,6 @@ namespace NodePilot.Infrastructure.Persistence.Configurations;
 
 public class SystemMetricsConfiguration : IEntityTypeConfiguration<SystemMetric>
 {
-    [Obsolete]
     public void Configure(EntityTypeBuilder<SystemMetric> builder)
     {
         builder.ToTable("system_metrics");
@@ -75,75 +74,78 @@ public class SystemMetricsConfiguration : IEntityTypeConfiguration<SystemMetric>
         builder.HasIndex(x => new { x.Status, x.CollectedAtUtc })
             .HasDatabaseName("ix_system_metrics_status_collected_at_utc");
 
-        // Amount of total reads is always greater or equal to failed reads
-        builder.HasCheckConstraint(
-            "ck_system_metrics_reads_valid",
-            "total_reads >= 0 AND successful_reads >= 0 AND successful_reads <= total_reads");
+        builder.ToTable(table =>
+        {
+            // Amount of total reads is always greater or equal to failed reads
+            table.HasCheckConstraint(
+                "ck_system_metrics_reads_valid",
+                "total_reads >= 0 AND successful_reads >= 0 AND successful_reads <= total_reads");
 
-        // Amount of total reads corresponds to configuration
-        builder.HasCheckConstraint(
-            "ck_system_metrics_total_reads_matches_enabled_metrics",
-            "total_reads = " +
-            "(CASE WHEN cpu_enabled THEN 1 ELSE 0 END) + " +
-            "(CASE WHEN ram_enabled THEN 1 ELSE 0 END)");
+            // Amount of total reads corresponds to configuration
+            table.HasCheckConstraint(
+                "ck_system_metrics_total_reads_matches_enabled_metrics",
+                "total_reads = " +
+                "(CASE WHEN cpu_enabled THEN 1 ELSE 0 END) + " +
+                "(CASE WHEN ram_enabled THEN 1 ELSE 0 END)");
 
-        // CPU reads disabled and there is no valuue
-        builder.HasCheckConstraint(
-            "ck_system_metrics_cpu_disabled_has_no_value",
-            "cpu_enabled OR cpu_usage_percent IS NULL");
+            // CPU reads disabled and there is no valuue
+            table.HasCheckConstraint(
+                "ck_system_metrics_cpu_disabled_has_no_value",
+                "cpu_enabled OR cpu_usage_percent IS NULL");
 
-        // CPU load is NULL OR between 0 and 100 %
-        builder.HasCheckConstraint(
-            "ck_system_metrics_cpu_usage_percent_range",
-            "cpu_usage_percent IS NULL OR (cpu_usage_percent >= 0 AND cpu_usage_percent <= 100)");
+            // CPU load is NULL OR between 0 and 100 %
+            table.HasCheckConstraint(
+                "ck_system_metrics_cpu_usage_percent_range",
+                "cpu_usage_percent IS NULL OR (cpu_usage_percent >= 0 AND cpu_usage_percent <= 100)");
 
-        // RAM reads disabled and there is no valuue
-        builder.HasCheckConstraint(
-            "ck_system_metrics_ram_disabled_has_no_value",
-            "ram_enabled OR ram_usage_percent IS NULL");
+            // RAM reads disabled and there is no valuue
+            table.HasCheckConstraint(
+                "ck_system_metrics_ram_disabled_has_no_value",
+                "ram_enabled OR ram_usage_percent IS NULL");
 
-        // RAM load is NULL OR between 0 and 100 %
-        builder.HasCheckConstraint(
-            "ck_system_metrics_ram_usage_percent_range",
-            "ram_usage_percent IS NULL OR (ram_usage_percent >= 0 AND ram_usage_percent <= 100)");
+            // RAM load is NULL OR between 0 and 100 %
+            table.HasCheckConstraint(
+                "ck_system_metrics_ram_usage_percent_range",
+                "ram_usage_percent IS NULL OR (ram_usage_percent >= 0 AND ram_usage_percent <= 100)");
 
-        // Temperature is NULL OR within what CPU sensors can physically report
-        builder.HasCheckConstraint(
-            "ck_system_metrics_cpu_temperature_range",
-            "cpu_temperature_celsius IS NULL OR (cpu_temperature_celsius >= -40 AND cpu_temperature_celsius <= 150)");
+            // Temperature is NULL OR within what CPU sensors can physically report
+            table.HasCheckConstraint(
+                "ck_system_metrics_cpu_temperature_range",
+                "cpu_temperature_celsius IS NULL OR (cpu_temperature_celsius >= -40 AND cpu_temperature_celsius <= 150)");
 
-        // Valid Success Shape
-        builder.HasCheckConstraint(
-            "ck_system_metrics_success_shape",
-            "(" +
-            "status != 0 OR " +
-            "(" +
-            "successful_reads = total_reads AND " +
-            "failure_reason IS NULL" +
-            ")" +
-            ")");
+            // Valid Success Shape
+            table.HasCheckConstraint(
+                "ck_system_metrics_success_shape",
+                "(" +
+                "status != 0 OR " +
+                "(" +
+                "successful_reads = total_reads AND " +
+                "failure_reason IS NULL" +
+                ")" +
+                ")");
 
-        // Valid Partial Success Shape
-        builder.HasCheckConstraint(
-            "ck_system_metrics_partial_success_shape",
-            "(" +
-            "status != 1 OR " +
-            "(" +
-            "successful_reads > 0 AND " +
-            "successful_reads < total_reads AND " +
-            "failure_reason IS NOT NULL" +
-            ")" +
-            ")");
+            // Valid Partial Success Shape
+            table.HasCheckConstraint(
+                "ck_system_metrics_partial_success_shape",
+                "(" +
+                "status != 1 OR " +
+                "(" +
+                "successful_reads > 0 AND " +
+                "successful_reads < total_reads AND " +
+                "failure_reason IS NOT NULL" +
+                ")" +
+                ")");
 
-        // Valid Fail Shape
-        builder.HasCheckConstraint(
-            "ck_system_metrics_read_failed_shape",
-            "(" +
-            "status != 2 OR " +
-            "(" +
-            "successful_reads = 0 AND " +
-            "failure_reason IS NOT NULL" +
-            ")" +
-            ")");
+            // Valid Fail Shape
+            table.HasCheckConstraint(
+                "ck_system_metrics_read_failed_shape",
+                "(" +
+                "status != 2 OR " +
+                "(" +
+                "successful_reads = 0 AND " +
+                "failure_reason IS NOT NULL" +
+                ")" +
+                ")");
+        });
     }
 }
