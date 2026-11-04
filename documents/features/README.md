@@ -8,10 +8,11 @@ One document describes one module. They all use the same structure:
 
 | Module | Document |
 |---|---|
-| Authentication & access control | [authentication.md](authentication.md) |
+| Authentication & access control (setup, sign-in, roles) | [authentication.md](authentication.md) |
+| Users & invitations | [users-and-invitations.md](users-and-invitations.md) |
 | System monitoring (dashboard) | [system-monitoring.md](system-monitoring.md) |
 | Files & media | [files-and-media.md](files-and-media.md) |
-| Ad blocking (Pi-hole) | [ad-blocking.md](ad-blocking.md) |
+| Ad blocking (Pi-hole) and its settings | [ad-blocking.md](ad-blocking.md) |
 | Health checks | [health-checks.md](health-checks.md) |
 | Web client & deployment | [web-client.md](web-client.md) |
 
