@@ -27,6 +27,18 @@ app.UseRateLimiter();
 
 app.MapControllers();
 
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = c => c.Tags.Contains("ready"),
+    ResponseWriter = HealthCheckResponseWriter.WriteAsync,
+}).AllowAnonymous();
+
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false,
+    ResponseWriter = HealthCheckResponseWriter.WriteAsync,
+}).AllowAnonymous();
+
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     ResponseWriter = HealthCheckResponseWriter.WriteAsync,
