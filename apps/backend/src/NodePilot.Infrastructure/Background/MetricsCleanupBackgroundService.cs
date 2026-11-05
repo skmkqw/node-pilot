@@ -30,9 +30,7 @@ public sealed class MetricsCleanupBackgroundService(
 
                 if (settings.CleanupEnabled)
                 {
-                    await CleanupMetricsAsync(
-                        Math.Max(1, settings.MaxMetricAgeHours),
-                        ct);
+                    await CleanupMetricsAsync(settings, ct);
                 }
                 else
                 {
@@ -55,7 +53,7 @@ public sealed class MetricsCleanupBackgroundService(
         }
     }
 
-    private async Task CleanupMetricsAsync(int maxAgeHours, CancellationToken ct)
+    private async Task CleanupMetricsAsync(RetentionSettings settings, CancellationToken ct)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
 
