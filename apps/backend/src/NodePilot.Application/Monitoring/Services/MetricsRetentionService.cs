@@ -7,17 +7,16 @@ public sealed class MetricsRetentionService(ISystemMetricsRepository repository)
 {
     private readonly ISystemMetricsRepository _repository = repository;
 
-    public async Task<RetentionResult> ApplyRetentionAsync(TimeSpan retention, CancellationToken ct)
+    public async Task<RetentionResult> ApplyRetentionAsync(TimeSpan retention, int maxStoredSamples, CancellationToken ct)
     {
-        var startedAtUtc = DateTime.UtcNow;
+        DateTime startedAtUtc = DateTime.UtcNow;
+        DateTime cutoff = startedAtUtc - retention;
 
-        var cutoff = startedAtUtc - retention;
+        int ageBasedDeleted = await _repository.DeleteOlderThanAsync(cutoff, ct);
+        int amountBasedDeleted = await _repository.DeleteExceedingCountAsync(maxStoredSamples, ct);
 
-        int deleted =
-            await _repository.DeleteOlderThanAsync(cutoff, ct);
+        DateTime completedAtUtc = DateTime.UtcNow;
 
-        var completedAtUtc = DateTime.UtcNow;
-
-        return new RetentionResult(startedAtUtc, completedAtUtc, cutoff, deleted);
+        return new RetentionResult(startedAtUtc, completedAtUtc, cutoff, ageBasedDeleted, amountBasedDeleted);
     }
 }

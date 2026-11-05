@@ -61,18 +61,22 @@ public sealed class MetricsCleanupBackgroundService(
             scope.ServiceProvider
                 .GetRequiredService<IMetricsRetentionService>();
 
-        var retention = TimeSpan.FromHours(maxAgeHours);
+        var retention = TimeSpan.FromHours(Math.Max(1, settings.MaxMetricAgeHours));
 
-        var result = await retentionService.ApplyRetentionAsync(retention, ct);
+        var result = await retentionService.ApplyRetentionAsync(retention, settings.MaxStoredSamples, ct);
 
         var duration =
             result.CompletedAtUtc - result.StartedAtUtc;
 
+        int totalDeleted = result.AgeBasedDeletedMetrics + result.AmountBasedDeletedMetrics;
+
         _logger.LogInformation(
-            "Metrics cleanup job completed in {Duration} at {CompletedAt}. Cutoff: {Cutoff}. Total records deleted: {TotalDeleted}",
+            "Metrics cleanup job completed in {Duration} at {CompletedAt}. Cutoff: {Cutoff}.\nDeleted based on age: {AgeBased}.\nDeleted based on maximum amount: {AmountBased}\nTotal records deleted: {TotalDeleted}",
                 duration,
                 result.CompletedAtUtc,
                 result.CutoffUtc,
-                result.DeletedMetrics);
+                result.AgeBasedDeletedMetrics,
+                result.AmountBasedDeletedMetrics,
+                totalDeleted);
     }
 }
