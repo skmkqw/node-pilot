@@ -1,6 +1,6 @@
-# NodePilot: work plan (~5.5 h)
+# NodePilot: work plan (~6 h)
 
-Current state (2026-11-04, after merging `main` with users, invite links, Pi-hole settings in the app and temperature history): 166/166 backend tests pass, and `eslint` and `tsc` are clean on the web app.
+Current state (2026-11-05, after merging `main` with users, invite links, Pi-hole settings in the app and temperature history, plus the health-check tests): 183/183 backend tests pass, and `eslint` and `tsc` are clean on the web app.
 
 | # | Task | Type | Estimate |
 |---|---|---|---|
@@ -15,8 +15,9 @@ Current state (2026-11-04, after merging `main` with users, invite links, Pi-hol
 | 8 | Native deployment with systemd | feature / docs | 40 min |
 | 9 | Handle upload name clashes (replace / keep both) | feature | 40 min (stretch) |
 | 10 | End other sessions when the password changes | security fix | 25 min |
+| 11 | Apply monitoring settings changes consistently | bugfix | 35 min |
 
-Do 0–4 and 10 first; they are short and fix real defects. Tasks 5–7 are the main feature work. Task 9 is for when time is left.
+Do 0–4 and 10 first; they are short and fix real defects. Tasks 5–7 are the main feature work. Do task 11 together with task 8, because it matters most for a native install. Task 9 is for when time is left.
 
 ---
 
@@ -59,9 +60,9 @@ The checks already carry `ready` / `general` tags (`apps/backend/src/NodePilot.A
 4. Consider pointing the compose `healthcheck` at `/health/ready` (or `/health/live` for the backend's own restart policy).
 5. Update `documents/features/health-checks.md` (the "Limitations" section describes this exact bug), `documents/api.md` and the README.
 
-**Progress (uncommitted):** steps 1–3 and 5 are done. Still open: step 4. `compose.yaml`, `apps/backend/Dockerfile` and `start.sh` still probe `/health`. When this changes, update the "Limitations" section of `health-checks.md` and the table in `api.md`.
+**Progress (uncommitted):** steps 1–3 and 5 and the tests are done. Still open: step 4. `compose.yaml`, `apps/backend/Dockerfile` and `start.sh` still probe `/health`. When this changes, update the "Limitations" section of `health-checks.md` and the table in `api.md`.
 
-**Tests:** in `NodePilotApiFactory`, set `Monitoring:Collection:Enabled=false` and check that `/health` returns 200 and the collector entry is Healthy. Add a unit test for the check itself, giving it a `MetricsCollectorState` that was never started.
+**Tests (done):** `HealthEndpointTests` runs the API with `Monitoring:Collection:Enabled=false` and checks all three endpoints. `MetricsCollectorReadinessCheckTests` covers every result of the check and the staleness window.
 
 ---
 
@@ -297,3 +298,34 @@ Note: with members, *Replace* lets any household member overwrite anyone's file.
 **Tests:** sign in with two clients as the same user, change the password with client A, then check that client A still gets `200` on `/api/auth/me` and client B gets `401`.
 
 This is also the cheapest step towards "log out all devices" (a button that just bumps the stamp) and towards server-side sessions in `auth-architecture-proposal.md` §2.1.
+
+---
+
+## 11. Apply monitoring settings changes consistently (35 min)
+
+**Problem.** `appsettings.json` is loaded with `reloadOnChange`, and `MonitoringSettingsProvider` returns `IOptionsMonitor.CurrentValue`. So an edit to the file while the backend runs reaches some readers immediately and others never:
+
+| Reader | Reads settings | Picks up an edit |
+|---|---|---|
+| `MetricsSamplingBackgroundService` (`Enabled`, `IntervalSeconds`) | once, at startup | **no**, needs a restart |
+| `SystemMetricsCollector` (`CollectCpuUsage`, `CollectRamUsage`, …) | every cycle | yes |
+| `MetricsCleanupBackgroundService` (`Retention`) | every iteration | yes |
+| `SystemOverviewProvider` | every request | yes |
+| `MetricsCollectorReadinessCheck` (`Enabled`, `IntervalSeconds`) | every request | yes |
+
+What goes wrong:
+- **Collection off → on:** the health check sees `Enabled = true` while the sampler never started. `metrics_collector` reports *"not running"* (Unhealthy) until a restart, although nothing is broken.
+- **Collection on → off:** the health check says "disabled" (Healthy) while the sampler keeps collecting and writing samples.
+- **Interval change:** the staleness window (`max(30 s, 3 × IntervalSeconds)`) changes, but the timer doesn't. Shortening the interval from 60 s to 5 s while running makes the collector "stale" after 30 s, although it still samples every 60 s.
+- **Invalid edit:** validation (`ValidateFluently`) runs again on reload. With an invalid file, every `CurrentValue` read throws `OptionsValidationException` until the file is fixed. The health check turns Unhealthy, the overview endpoint returns 500 and every sampling cycle fails. `ValidateOnStart` protects only the startup.
+
+This mostly matters for the systemd deployment (task #8), where `appsettings.json` lives next to the binaries and is easy to edit in place. In Docker the file sits inside the image, and environment variables don't reload.
+
+**What to do.** Pick one model and use it everywhere:
+
+- **A. "Changes apply on restart" (recommended).** In `MonitoringSettingsProvider`, inject `IOptions<MonitoringSettings>` instead of `IOptionsMonitor` and return `.Value`. Every reader then sees the startup values, an invalid edit has no effect until the next restart (which fails fast with a clear message), and nothing else changes. Document it in `system-monitoring.md` ("restart the backend after editing monitoring settings").
+- **B. Live reload.** Keep `IOptionsMonitor`, subscribe with `OnChange` in the sampler, and restart its loop (stop the `PeriodicTimer`, start or stop collection, use the new interval). Handle invalid reloads by keeping the last valid settings. This takes noticeably longer (about 90 min with tests) and is only worth it if you plan a settings UI for monitoring.
+
+Either way, add the effective `intervalSeconds` to the `metrics_collector` health data, so you can see which interval the check uses.
+
+**Tests (option A):** a unit test that `MonitoringSettingsProvider.Current` keeps returning the startup value after the configuration changes (use `ConfigurationBuilder` with an in-memory source and call `Reload()` after changing its data). The existing `MetricsCollectorReadinessCheckTests` cover the check itself.
