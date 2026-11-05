@@ -59,6 +59,8 @@ The checks already carry `ready` / `general` tags (`apps/backend/src/NodePilot.A
 4. Consider pointing the compose `healthcheck` at `/health/ready` (or `/health/live` for the backend's own restart policy).
 5. Update `documents/features/health-checks.md` (the "Limitations" section describes this exact bug), `documents/api.md` and the README.
 
+**Progress (uncommitted):** steps 1–3 and 5 are done. Still open: step 4. `compose.yaml`, `apps/backend/Dockerfile` and `start.sh` still probe `/health`. When this changes, update the "Limitations" section of `health-checks.md` and the table in `api.md`.
+
 **Tests:** in `NodePilotApiFactory`, set `Monitoring:Collection:Enabled=false` and check that `/health` returns 200 and the collector entry is Healthy. Add a unit test for the check itself, giving it a `MetricsCollectorState` that was never started.
 
 ---

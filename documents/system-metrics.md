@@ -198,14 +198,23 @@ Because sampling runs in the background, a newly started application may briefly
 The backend exposes:
 
 ```http
-GET /health
+GET /health         # all checks
+GET /health/ready   # database_status and metrics_collector
+GET /health/live    # no checks, process liveness only
 ```
+
+See [features/health-checks.md](features/health-checks.md) for the endpoints and HTTP status codes.
 
 ### `metrics_collector`
 
 `metrics_collector` uses `MetricsCollectorState`, which is updated by `MetricsSamplingBackgroundService`.
 
-The check returns unhealthy when any of these are true:
+The check returns, in this order:
+
+- **healthy** with the description "Metrics collection is disabled." when `Monitoring:Collection:Enabled` is `false`, on any OS
+- **degraded** on a non-Linux host, because `/proc` and `/sys` are not available
+
+Otherwise it returns unhealthy when any of these are true:
 
 - the background sampler is not currently running
 - no successful collection has completed yet
@@ -215,6 +224,7 @@ The threshold scales with the configured interval, so the app tolerates a few de
 
 Health data for this check includes:
 
+- `enabled`: the current value of `Monitoring:Collection:Enabled`
 - `isRunning`: whether the hosted sampler is currently running
 - `lastSuccessfulCollectionUtc`: timestamp of the latest successful collection, or `never`
 - `lastAttemptUtc`: timestamp of the latest attempt, or `never`

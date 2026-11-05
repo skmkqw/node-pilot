@@ -212,7 +212,7 @@ docker compose up --build -d
 ```
 
 - Web: <http://localhost:3000> (or `http://<server-ip>:3000` from a phone)
-- Backend: <http://localhost:5000>, health check at `/health`
+- Backend: <http://localhost:5000>, health checks at `/health`, `/health/ready` and `/health/live`
 
 Both containers restart automatically. The database and encryption keys are kept in the `nodepilot-data` volume, and `NODEPILOT_FILES_DIR` is mounted as the file manager root.
 
@@ -248,7 +248,7 @@ npm run build
 
 ## Security notes
 
-- All `/api/*` endpoints require a signed-in user; only `/health`, sign-in/setup and the invite page's own endpoints are public. User management and Pi-hole settings require the Admin role.
+- All `/api/*` endpoints require a signed-in user; only the `/health` endpoints, sign-in/setup and the invite page's own endpoints are public. User management and Pi-hole settings require the Admin role.
 - Invite links carry a 256-bit random token; only its SHA-256 hash is stored, each link works once and expires after at most 7 days.
 - Every request re-checks that the account still exists, so removing a user ends their sessions at once.
 - Sessions use an HTTP-only, `SameSite=Lax` cookie; login is limited to 5 attempts per minute per IP.
