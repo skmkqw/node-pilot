@@ -97,5 +97,7 @@ public class SystemMetricsProviderTests
         public Task SaveAsync(SystemMetric systemMetric, CancellationToken ct = default) => Task.CompletedTask;
 
         public Task<int> DeleteOlderThanAsync(DateTime cutoffUtc, CancellationToken ct = default) => Task.FromResult(0);
+
+        public Task<int> DeleteExceedingCountAsync(int maxStoredSamples, CancellationToken ct = default) => Task.FromResult(0);
     }
 }
