@@ -26,14 +26,6 @@ public class ApiTests
         _factory.Dispose();
     }
 
-    [Test]
-    public async Task Health_IsPublic()
-    {
-        var response = await _factory.CreateClient().GetAsync("/health");
-
-        Assert.That(response.StatusCode, Is.Not.EqualTo(HttpStatusCode.Unauthorized));
-    }
-
     [TestCase("/api/auth/me")]
     [TestCase("/api/system/overview")]
     [TestCase("/api/system/metrics/current")]

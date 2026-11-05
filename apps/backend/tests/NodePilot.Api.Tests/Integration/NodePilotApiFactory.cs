@@ -15,8 +15,13 @@ public sealed class NodePilotApiFactory : WebApplicationFactory<Program>
 
     private readonly string _sandbox = Directory.CreateTempSubdirectory("nodepilot-api-").FullName;
 
-    public NodePilotApiFactory()
+    private readonly IReadOnlyDictionary<string, string?> _settings;
+
+    /// <param name="settings">Configuration values that override appsettings and the test defaults.</param>
+    public NodePilotApiFactory(IReadOnlyDictionary<string, string?>? settings = null)
     {
+        _settings = settings ?? new Dictionary<string, string?>();
+
         // Read eagerly while the services are registered, so it has to be an environment variable.
         Environment.SetEnvironmentVariable(
             "NODE_PILOT_DB_CONNECTION_STRING",
@@ -30,6 +35,7 @@ public sealed class NodePilotApiFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Testing");
 
         builder.ConfigureAppConfiguration((_, configuration) =>
+        {
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 // Integration tests sign in many times; production keeps the default of 5.
@@ -37,7 +43,10 @@ public sealed class NodePilotApiFactory : WebApplicationFactory<Program>
                 ["FileManager:RootPath"] = FilesRoot,
                 ["PiHole:BaseUrl"] = string.Empty,
                 ["PiHole:Password"] = string.Empty,
-            }));
+            });
+
+            configuration.AddInMemoryCollection(_settings);
+        });
     }
 
     /// <summary>Completes the first-start setup (once per factory) and signs a new client in.</summary>
