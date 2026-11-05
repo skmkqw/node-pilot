@@ -1,107 +1,31 @@
-# NodePilot: work plan (~6 h)
-
-Current state (2026-11-05, after merging `main` with users, invite links, Pi-hole settings in the app and temperature history, plus the health-check tests): 183/183 backend tests pass, and `eslint` and `tsc` are clean on the web app.
+# NodePilot: work plan
 
 | # | Task | Type | Estimate |
 |---|---|---|---|
-| 0 | Housekeeping: vulnerable NuGet packages | fix | 10 min |
-| 1 | Health checks that don't fail when collection is disabled | bugfix | 45 min |
-| 2 | ~~Store session encryption keys in a known place~~ (done), leftovers | fix | 10 min |
-| 3 | Make `MaxStoredSamples` do something (or delete it) | bugfix / cleanup | 30 min |
-| 4 | Get the real client IP behind a reverse proxy | fix | 35 min |
-| 5 | Use the configured alert thresholds in the UI | feature / refactor | 50 min |
-| 6 | Warn when the dashboard shows old data | feature | 35 min |
-| 7 | Rename and move in the file manager | feature | 75 min |
-| 8 | Native deployment with systemd | feature / docs | 40 min |
-| 9 | Handle upload name clashes (replace / keep both) | feature | 40 min (stretch) |
-| 10 | End other sessions when the password changes | security fix | 25 min |
-| 11 | Apply monitoring settings changes consistently | bugfix | 35 min |
-
-Do 0–4 and 10 first; they are short and fix real defects. Tasks 5–7 are the main feature work. Do task 11 together with task 8, because it matters most for a native install. Task 9 is for when time is left.
+| 1 | ~~Store session encryption keys in a known place~~ (done), leftovers | fix | 10 min |
+| 2 | Get the real client IP behind a reverse proxy | fix | 35 min |
+| 3 | Use the configured alert thresholds in the UI | feature / refactor | 50 min |
+| 4 | Warn when the dashboard shows old data | feature | 35 min |
+| 5 | Rename and move in the file manager | feature | 75 min |
+| 6 | Native deployment with systemd | feature / docs | 40 min |
+| 7 | Handle upload name clashes (replace / keep both) | feature | 40 min (stretch) |
+| 8 | End other sessions when the password changes | security fix | 25 min |
+| 9 | Apply monitoring settings changes consistently | bugfix | 35 min |
 
 ---
 
-## 0. Housekeeping (10 min)
-
-- ~~**`apps/web/next.config.ts` is broken.**~~ Fixed on `main`: `allowedDevOrigins` is now part of `nextConfig` and is filled automatically from the machine's LAN IPv4 addresses.
-- **Vulnerable NuGet packages.** `dotnet build` still warns (NU1903) about:
-  - `Microsoft.OpenApi` 2.0.0 (GHSA-v5pm-xwqc-g5wc)
-  - `SQLitePCLRaw.lib.e_sqlite3` 2.1.11 (GHSA-2m69-gcr7-jv3q)
-
-  Upgrade the packages that bring them in, or add direct `PackageReference`s to patched versions. Then re-run `dotnet test`.
-- **Optional:** NU1510 says `Microsoft.Extensions.Http` and `Microsoft.Extensions.Options.ConfigurationExtensions` are unnecessary direct references. Remove them if the build still passes.
-
----
-
-## 1. Health checks that don't fail when collection is disabled (45 min)
-
-**Problem.** `/health` runs three checks: `system_status`, `database_status` and `metrics_collector`. When any of them fails, the endpoint returns **503**. `MetricsCollectorReadinessCheck` reports *Unhealthy* when the sampler is not running. The sampler is never running in these cases:
-
-- `Monitoring:Collection:Enabled = false` (you deliberately turned collection off)
-- the backend runs on a non-Linux dev machine (every read fails, so there is never a "last successful collection")
-
-In both cases NodePilot reports itself as broken forever, although the API works fine. Anything that watches `/health` (Uptime Kuma, a systemd watchdog script, a reverse proxy health probe) will alert all the time. With Docker Compose it is worse: the `web` container waits for `service_healthy` and never starts.
-
-There is a second problem: liveness and readiness are mixed together.
-- **Liveness:** is the process alive? This decides whether it gets restarted.
-- **Readiness:** is it fully working? This decides whether to send traffic or raise a warning.
-
-The checks already carry `ready` / `general` tags (`apps/backend/src/NodePilot.Api/DependencyInjection.cs`), but only one endpoint exists.
-
-**What to do**
-
-1. In `MetricsCollectorReadinessCheck`, read `IMonitoringSettingsProvider.Current.Collection.Enabled` (the provider is already injected). When collection is disabled, return `HealthCheckResult.Healthy("Metrics collection is disabled.")` with `data["enabled"] = false`.
-2. Decide what a non-Linux host should report. **Degraded** fits best: the app works, but a feature is missing. Degraded maps to HTTP 200 by default, so monitors stay green while the JSON still shows the problem.
-3. Split the endpoint in `Program.cs`:
-   - `/health/live`: `Predicate = _ => false`. No checks run, so it answers 200 whenever the process responds.
-   - `/health/ready`: `Predicate = c => c.Tags.Contains("ready")`.
-   - `/health`: keep it with all checks, for backwards compatibility and the Postman collection.
-   - Mark all three `.AllowAnonymous()`, like `/health` today.
-4. Consider pointing the compose `healthcheck` at `/health/ready` (or `/health/live` for the backend's own restart policy).
-5. Update `documents/features/health-checks.md` (the "Limitations" section describes this exact bug), `documents/api.md` and the README.
-
-**Progress (uncommitted):** steps 1–3 and 5 and the tests are done. Still open: step 4. `compose.yaml`, `apps/backend/Dockerfile` and `start.sh` still probe `/health`. When this changes, update the "Limitations" section of `health-checks.md` and the table in `api.md`.
-
-**Tests (done):** `HealthEndpointTests` runs the API with `Monitoring:Collection:Enabled=false` and checks all three endpoints. `MetricsCollectorReadinessCheckTests` covers every result of the check and the staleness window.
-
----
-
-## 2. Store session encryption keys in a known place: done, small leftovers (10 min)
+## 1. Store session encryption keys in a known place: done, small leftovers (10 min)
 
 **Done on `main`.** `AddInfrastructure` now calls `AddDataProtection().SetApplicationName("NodePilot").PersistKeysToFileSystem(<data dir>/keys)`, where the data dir is the folder of the SQLite database (`DatabaseExtensions.ResolveDataDirectory`). The same key ring also encrypts the Pi-hole password stored in `app_settings`. In Docker the folder is on the `nodepilot-data` volume, and the README and `authentication.md` already say to back up `data/` as a whole.
 
 **Leftovers (optional)**
 
-1. **Permissions.** `data/keys` is created with the default mode (`755` here). The key files are what decrypt every session cookie and the Pi-hole password, so make the folder readable only by the service user: create it up front and `File.SetUnixFileMode(path, UserRead | UserWrite | UserExecute)` on Linux. This matters most for the native install (task 8).
+1. **Permissions.** `data/keys` is created with the default mode (`755` here). The key files are what decrypt every session cookie and the Pi-hole password, so make the folder readable only by the service user: create it up front and `File.SetUnixFileMode(path, UserRead | UserWrite | UserExecute)` on Linux. This matters most for the native install (task 6).
 2. **Test** that keys survive a restart: an integration test that logs in, builds a *second* `WebApplicationFactory` pointing at the same database/keys folder, and checks that the first factory's cookie still works on `/api/auth/me`.
 
 ---
 
-## 3. Make `MaxStoredSamples` do something, or delete it (30 min)
-
-**Problem.** `Monitoring:Retention:MaxStoredSamples` (250 000 in `appsettings.json`, 50 000 in `appsettings.Development.json`) is validated by `MonitoringSettingsValidator`, but nothing reads it. Cleanup (`MetricsCleanupBackgroundService` → `MetricsRetentionService`) only deletes rows older than `MaxMetricAgeHours`. A setting that is validated but ignored is misleading. Someone who changes it would expect the database size to change.
-
-For scale: at the default 15 s interval, 72 h of history is about 17 300 rows. The cap only matters if someone sets a short interval with a long retention, e.g. 5 s for 30 days is about 518 000 rows. That makes it a safety cap, not a main setting.
-
-**Option A: implement it (recommended)**
-1. Add `Task<int> DeleteExceedingCountAsync(int maxRows, CancellationToken ct)` to `ISystemMetricsRepository`. In SQLite this is one statement:
-   ```sql
-   DELETE FROM system_metrics
-   WHERE id NOT IN (SELECT id FROM system_metrics ORDER BY collected_at_utc DESC LIMIT @max)
-   ```
-   You can also do it in EF: find the timestamp of the N-th newest row, then `ExecuteDeleteAsync` everything older.
-2. In `MetricsRetentionService.ApplyRetentionAsync`, run the age-based delete first, then the count cap. Return both counts in `RetentionResult` and log them.
-3. Pass the setting through `MetricsCleanupBackgroundService` the same way as `MaxMetricAgeHours`.
-
-**Option B: remove it.** Delete it from `RetentionSettings`, the validator, both `appsettings*.json` files and the docs (`system-monitoring.md`).
-
-**Small extra fix in the same file.** `MetricsCleanupBackgroundService` reads `settings` once per loop. When cleanup is disabled it still wakes up every `CleanupIntervalMinutes` only to log "skipped". Log once and return instead, like `MetricsSamplingBackgroundService` does.
-
-**Test (option A):** insert N + 10 rows with an in-memory SQLite database, run retention, and check that exactly N rows remain and that the newest ones were kept.
-
----
-
-## 4. Get the real client IP behind a reverse proxy (35 min)
+## 2. Get the real client IP behind a reverse proxy (35 min)
 
 **Background.** Without Docker, the natural way to give NodePilot one address with HTTPS is a reverse proxy (Caddy, nginx, Traefik) in front of the backend and the web app, for example `https://nodepilot.home` → `localhost:5000` and `localhost:3000`. It also removes the "two ports must be open" limitation from `web-client.md`.
 
@@ -134,7 +58,7 @@ ASP.NET Core ignores these headers unless you turn on the **Forwarded Headers mi
 
 ---
 
-## 5. Use the configured alert thresholds in the UI (50 min)
+## 3. Use the configured alert thresholds in the UI (50 min)
 
 **Problem.** There are two sets of thresholds, and they disagree:
 
@@ -170,7 +94,7 @@ Changing `appsettings.json` has no effect on which channel card turns saffron or
 
 ---
 
-## 6. Warn when the dashboard shows old data (35 min)
+## 4. Warn when the dashboard shows old data (35 min)
 
 **Problem.** The CPU and Memory cards show `GET /api/system/metrics/current`, which is the **latest successful** sample in the database. If sampling starts failing (for example `/proc` can't be read) or the sampler crashes, that endpoint keeps returning the same old row. The dashboard keeps showing, say, "CPU 12 %" from an hour ago as if it were live, and the blinking *Live* badge in the page header says the opposite of the truth. `system-monitoring.md` lists this as a limitation.
 
@@ -179,7 +103,7 @@ Every response already includes `collectedAtUtc`, so the frontend has all it nee
 **What to do**
 
 1. Decide the staleness threshold. It should match the health check: `max(30 s, 3 × IntervalSeconds)`. The frontend doesn't know the interval, so either:
-   - add `samplingIntervalSeconds` to the overview or settings response (this pairs well with task 5), or
+   - add `samplingIntervalSeconds` to the overview or settings response (this pairs well with task 3), or
    - use a fixed 60 s on the client to start with.
 2. In `app/(app)/page.tsx`, compute `ageMs = now - Date.parse(metric.collectedAtUtc)`. Update `now` every few seconds with a small `useNow(5000)` hook so the age grows even when polling returns the same row.
 3. When the data is stale:
@@ -189,11 +113,11 @@ Every response already includes `collectedAtUtc`, so the frontend has all it nee
 4. For the relative time, reuse `formatRelative` in `lib/format.ts` (it already returns "4 minutes ago" / "just now"). Add a shorter variant there only if the card needs "4 min ago".
 5. Optional: if the backend returns 404 (no successful sample ever), show "Waiting for first sample…" instead of a generic error.
 
-**How to check it:** run the backend, then stop sampling by setting `Collection:Enabled=false` and restarting. The DB keeps the old rows, so the label should appear after the threshold. (Don't run this check together with task 1's old behaviour in Docker: the web container wouldn't start.)
+**How to check it:** run the backend, then stop sampling by setting `Collection:Enabled=false` and restarting. The DB keeps the old rows, so the label should appear after the threshold.
 
 ---
 
-## 7. Rename and move in the file manager (75 min)
+## 5. Rename and move in the file manager (75 min)
 
 **Problem.** `files-and-media.md` lists "no rename, move, copy". Right now the only way to fix a typo in a file name is to download, delete and re-upload it, which is painful for multi-GB videos.
 
@@ -231,7 +155,7 @@ Every response already includes `collectedAtUtc`, so the frontend has all it nee
 
 ---
 
-## 8. Native deployment with systemd (40 min)
+## 6. Native deployment with systemd (40 min)
 
 **Why.** The README explains `./start.sh` (development servers), `docker compose up` and running the parts separately with `dotnet run` / `npm run dev`. None of these is a way to leave NodePilot running on the server without Docker. The README needs a real "install on the host" path.
 
@@ -266,7 +190,7 @@ Every response already includes `collectedAtUtc`, so the frontend has all it nee
 
 ---
 
-## 9. Handle upload name clashes: replace or keep both (stretch, 40 min)
+## 7. Handle upload name clashes: replace or keep both (stretch, 40 min)
 
 **Problem.** Uploading a file whose name already exists fails with 409 *already exists*, and the docs tell you to "delete the old file first". When you upload a whole batch where one name clashes, `FilesController.UploadAsync` stops at the first error. Files before it are saved and files after it are not. (The web client sends one file per request, so this mostly hits API users.)
 
@@ -283,7 +207,7 @@ Note: with members, *Replace* lets any household member overwrite anyone's file.
 
 ---
 
-## 10. End other sessions when the password changes (25 min)
+## 8. End other sessions when the password changes (25 min)
 
 **Problem.** `POST /api/auth/password` updates the hash and sets `users.password_changed_at_utc`, but nothing reads that column. Sessions are self-contained cookies, and the per-request check in `AuthenticationExtensions.ValidateAccountAsync` only looks at whether the account exists and whether the role changed. So after "someone knows my password, let me change it", every device that is already signed in, including the attacker's, **stays signed in** for up to `SessionLifetimeHours` (7 days, sliding).
 
@@ -301,7 +225,7 @@ This is also the cheapest step towards "log out all devices" (a button that just
 
 ---
 
-## 11. Apply monitoring settings changes consistently (35 min)
+## 9. Apply monitoring settings changes consistently (35 min)
 
 **Problem.** `appsettings.json` is loaded with `reloadOnChange`, and `MonitoringSettingsProvider` returns `IOptionsMonitor.CurrentValue`. So an edit to the file while the backend runs reaches some readers immediately and others never:
 
@@ -319,7 +243,7 @@ What goes wrong:
 - **Interval change:** the staleness window (`max(30 s, 3 × IntervalSeconds)`) changes, but the timer doesn't. Shortening the interval from 60 s to 5 s while running makes the collector "stale" after 30 s, although it still samples every 60 s.
 - **Invalid edit:** validation (`ValidateFluently`) runs again on reload. With an invalid file, every `CurrentValue` read throws `OptionsValidationException` until the file is fixed. The health check turns Unhealthy, the overview endpoint returns 500 and every sampling cycle fails. `ValidateOnStart` protects only the startup.
 
-This mostly matters for the systemd deployment (task #8), where `appsettings.json` lives next to the binaries and is easy to edit in place. In Docker the file sits inside the image, and environment variables don't reload.
+This mostly matters for the systemd deployment (task 6), where `appsettings.json` lives next to the binaries and is easy to edit in place. In Docker the file sits inside the image, and environment variables don't reload.
 
 **What to do.** Pick one model and use it everywhere:
 
@@ -327,5 +251,7 @@ This mostly matters for the systemd deployment (task #8), where `appsettings.jso
 - **B. Live reload.** Keep `IOptionsMonitor`, subscribe with `OnChange` in the sampler, and restart its loop (stop the `PeriodicTimer`, start or stop collection, use the new interval). Handle invalid reloads by keeping the last valid settings. This takes noticeably longer (about 90 min with tests) and is only worth it if you plan a settings UI for monitoring.
 
 Either way, add the effective `intervalSeconds` to the `metrics_collector` health data, so you can see which interval the check uses.
+
+Also in `MetricsCleanupBackgroundService`: when `CleanupEnabled` is false, the loop still wakes up every `CleanupIntervalMinutes` only to log "skipped". With option A the value can't change at runtime, so log once and return, like `MetricsSamplingBackgroundService` does. (With option B, keep the loop but log only when the value changes.)
 
 **Tests (option A):** a unit test that `MonitoringSettingsProvider.Current` keeps returning the startup value after the configuration changes (use `ConfigurationBuilder` with an in-memory source and call `Reload()` after changing its data). The existing `MetricsCollectorReadinessCheckTests` cover the check itself.

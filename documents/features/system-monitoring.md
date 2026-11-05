@@ -31,6 +31,7 @@ The dashboard shows the server's health: CPU, memory, thermal and disk channel c
 - **Linux only.** All values come from `/proc` and `/sys`. On Windows or macOS (for example a dev machine), CPU and RAM samples are stored as failed, and the cards show *Unavailable*.
 - **Only CPU, RAM and temperature have history.** Disk, load and uptime are live values only. Samples recorded before the `AddCpuTemperatureHistory` migration have no temperature, so the TEMP chart is empty for that period.
 - **History is kept for 72 hours by default** (`MaxMetricAgeHours`). The API accepts ranges up to 7 days, but anything older than the retention period is already deleted.
+- **History is also capped at 250 000 samples** (`MaxStoredSamples`). The oldest samples beyond the cap are deleted, even if they are still inside the retention period. At the default 15 s interval, 72 h is only about 17 300 samples, so the cap matters only with a short interval and a long retention (e.g. 5 s for 30 days is about 518 000).
 - **Disk shows only the `/` filesystem.** Other mounts (a data disk, a NAS share) are not shown. **In Docker, `/` is the container's own filesystem**, so this value may differ from the host disk you care about.
 - **Inside Docker, some host details are wrong.**
   - *Hostname* is the container ID unless `hostname:` is set in `compose.yaml`.
@@ -59,7 +60,9 @@ Three independent flows:
 
 2. Retention (background)
    MetricsCleanupBackgroundService ─ every CleanupIntervalMinutes
-     └─ MetricsRetentionService → DELETE WHERE collected_at_utc < now − MaxMetricAgeHours
+     └─ MetricsRetentionService
+          ├─ DeleteOlderThanAsync        DELETE WHERE collected_at_utc < now − MaxMetricAgeHours
+          └─ DeleteExceedingCountAsync   DELETE all but the newest MaxStoredSamples rows
 
 3. Reads (HTTP)
    GET /api/system/metrics/current     → latest row with status != ReadFailed
@@ -89,7 +92,11 @@ Three independent flows:
 - **Which settings apply without a restart:**
   - Read **once** at startup: `Collection.Enabled` and `IntervalSeconds`. The `PeriodicTimer` is created once.
   - Read on every cycle or request: `CollectCpuUsage`/`CollectRamUsage`/`CollectTemperature` (each sample), `CollectDiskUsage`/`CollectTemperature` (each overview request) and the retention values (each cleanup loop). Edits to `appsettings.json` for these are picked up through `IOptionsMonitor`.
-- **Unused settings:** `Retention.MaxStoredSamples` and the whole `Alerts` section are validated but not used yet. The UI severities come from `usageSeverity` / `temperatureSeverity` in `apps/web/src/lib/format.ts`.
+- **Retention runs in two steps** (`MetricsRetentionService.ApplyRetentionAsync`): first the age cutoff, then the count cap, so the cap only sees rows that survived the age cutoff.
+  - The cap is a single `ExecuteDeleteAsync`: order by `collected_at_utc`, then `id`, both descending; skip the newest `MaxStoredSamples`; delete the rest.
+  - There is no separate count query, so a table below the cap is left untouched, and a sample inserted at the same moment can't shift the cut.
+  - Each run logs both counts (`RetentionResult.AgeBasedDeletedMetrics` / `AmountBasedDeletedMetrics`).
+- **Unused settings:** the whole `Alerts` section is validated but not used yet. The UI severities come from `usageSeverity` / `temperatureSeverity` in `apps/web/src/lib/format.ts`.
 - **Edge case:** with CPU and RAM collection both disabled but `Collection.Enabled = true`, rows are still written with `TotalReads = 0` and status `Success`. Only the temperature (if enabled) has a value.
 - **Temperature selection** (`LinuxSystemParsers.SelectCpuTemperatureCelsius`):
   - Reads `thermal_zone*/type,temp` and `hwmon*/name,temp1_input`.
@@ -110,10 +117,10 @@ Three independent flows:
 | `Retention:CleanupEnabled` | `true` | — | no |
 | `Retention:MaxMetricAgeHours` | `72` | 1–8760 | no |
 | `Retention:CleanupIntervalMinutes` | `30` | 1–1440 | no |
-| `Retention:MaxStoredSamples` | `250000` | 100–10M | *not used* |
+| `Retention:MaxStoredSamples` | `250000` | 100–10M | no |
 | `Alerts:*` | — | validated | *not used* |
 
-Unknown keys under `Monitoring` stop the app at startup, so a typo is caught immediately. `appsettings.Development.json` uses shorter retention (6 h, cleanup every 5 min).
+Unknown keys under `Monitoring` stop the app at startup, so a typo is caught immediately. `appsettings.Development.json` uses shorter retention (6 h, cleanup every 5 min, at most 50 000 samples).
 
 ### API
 
@@ -127,7 +134,7 @@ All three require a signed-in user (any role). Validation codes: `SystemMetrics.
 
 ### Tests
 
-`LinuxSystemParsersTests` (uptime, loadavg, os-release, sensor priority and plausibility), `SystemMetricsProviderTests` (UTC bucketing, temperature summaries that skip samples without a sensor, the 7-day range limit), and the `Overview_ReturnsHostInformation` integration test.
+`LinuxSystemParsersTests` (uptime, loadavg, os-release, sensor priority and plausibility), `SystemMetricsProviderTests` (UTC bucketing, temperature summaries that skip samples without a sensor, the 7-day range limit), and the `Overview_ReturnsHostInformation` integration test. Retention (both the age cutoff and the sample cap) has no automated test yet.
 
 ### Key files
 
