@@ -30,9 +30,7 @@ public sealed class MetricsCleanupBackgroundService(
 
                 if (settings.CleanupEnabled)
                 {
-                    await CleanupMetricsAsync(
-                        Math.Max(1, settings.MaxMetricAgeHours),
-                        ct);
+                    await CleanupMetricsAsync(settings, ct);
                 }
                 else
                 {
@@ -55,7 +53,7 @@ public sealed class MetricsCleanupBackgroundService(
         }
     }
 
-    private async Task CleanupMetricsAsync(int maxAgeHours, CancellationToken ct)
+    private async Task CleanupMetricsAsync(RetentionSettings settings, CancellationToken ct)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
 
@@ -63,18 +61,22 @@ public sealed class MetricsCleanupBackgroundService(
             scope.ServiceProvider
                 .GetRequiredService<IMetricsRetentionService>();
 
-        var retention = TimeSpan.FromHours(maxAgeHours);
+        var retention = TimeSpan.FromHours(Math.Max(1, settings.MaxMetricAgeHours));
 
-        var result = await retentionService.ApplyRetentionAsync(retention, ct);
+        var result = await retentionService.ApplyRetentionAsync(retention, settings.MaxStoredSamples, ct);
 
         var duration =
             result.CompletedAtUtc - result.StartedAtUtc;
 
+        int totalDeleted = result.AgeBasedDeletedMetrics + result.AmountBasedDeletedMetrics;
+
         _logger.LogInformation(
-            "Metrics cleanup job completed in {Duration} at {CompletedAt}. Cutoff: {Cutoff}. Total records deleted: {TotalDeleted}",
+            "Metrics cleanup job completed in {Duration} at {CompletedAt}. Cutoff: {Cutoff}.\nDeleted based on age: {AgeBased}.\nDeleted based on maximum amount: {AmountBased}\nTotal records deleted: {TotalDeleted}",
                 duration,
                 result.CompletedAtUtc,
                 result.CutoffUtc,
-                result.DeletedMetrics);
+                result.AgeBasedDeletedMetrics,
+                result.AmountBasedDeletedMetrics,
+                totalDeleted);
     }
 }

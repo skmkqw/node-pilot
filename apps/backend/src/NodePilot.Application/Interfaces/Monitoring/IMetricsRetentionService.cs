@@ -6,5 +6,6 @@ public interface IMetricsRetentionService
 {
     Task<RetentionResult> ApplyRetentionAsync(
         TimeSpan retention,
+        int maxStoredSamples,
         CancellationToken ct = default);
 }

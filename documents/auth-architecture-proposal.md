@@ -38,7 +38,7 @@ If the cloud alone decides who gets into which server, then **one bug or one bre
 | T3. Server impersonation | An attacker registers a fake server under Alice's server ID, or hijacks its domain, and collects her credentials or files. |
 | T4. Cloud compromise | The cloud database leaks, or an insider or bug mints tokens. |
 | T5. Relay eavesdropping | Traffic forwarded through the cloud is readable by the cloud. |
-| T6. Revocation gaps | A stolen phone keeps access because sessions are self-contained. Partly true today: removing a user revokes their sessions at once, but logout and a password change don't revoke anything (see TASKS.md #10). |
+| T6. Revocation gaps | A stolen phone keeps access because sessions are self-contained. Partly true today: removing a user revokes their sessions at once, but logout and a password change don't revoke anything (see TASKS.md #8). |
 | T7. Classic web issues | CSRF, open redirects in the login flow, session fixation, credential stuffing. |
 | T8. Cloud outage | The cloud is down and nobody can get into their own server, even at home. |
 
@@ -78,7 +78,7 @@ audit_log    (at, user_id, action, details)
 - **Roles:** today's `Admin`/`Member` map to `admin`/`member`. An explicit `owner` (the one who can't be removed by other admins, and who does pairing) and a read-only `viewer` are the missing ones. Today "you can't remove or demote yourself" is the only guarantee that an admin remains.
 - **Server-side sessions** replace the self-contained cookie. The cookie holds only a random 256-bit ID, and the DB stores just its SHA-256 hash. Deleting a row logs that device out immediately (fixes T6). In ASP.NET Core this is a custom `ITicketStore` on the cookie handler, or a small custom scheme.
 - The cookie should be `__Host-nodepilot`: `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`, no `Domain`. The `__Host-` prefix stops sibling subdomains from setting or overwriting it, which matters once servers share a parent domain (see 2.4).
-  Until then, the cheap intermediate step is a security stamp in the cookie that `ValidateAccountAsync` (which already runs per request) compares with the database. That gives "password change / log out all devices revokes everything" without a sessions table (TASKS.md #10).
+  Until then, the cheap intermediate step is a security stamp in the cookie that `ValidateAccountAsync` (which already runs per request) compares with the database. That gives "password change / log out all devices revokes everything" without a sessions table (TASKS.md #8).
 - **Roles become authorization policies** on controllers. One exists today: `Admin` on `UsersController`, `InvitationsController` and `SettingsController`. Everything else is open to any signed-in user. Next: `[Authorize(Policy = "CanModifyFiles")]` on upload and delete, `"CanControlAdBlock"` on `POST /api/adblock/blocking`, and read endpoints for every member, which is what a `viewer` role needs.
 - Identify external identities by **`(issuer, subject)`, never by email.** Emails change and get reused by new accounts at some providers. Matching by email is a classic account takeover bug.
 
@@ -340,7 +340,7 @@ Recommended: start with **R1** (document Tailscale) and LAN access via the per-s
 
 Extra checks on the server once it is reachable from outside:
 - Validate the `Host` header against its own hostname(s): `AllowedHosts` in `appsettings.json` is currently `*`. This protects against DNS rebinding.
-- Rate-limit login and invite endpoints **per account** as well as per IP (behind the relay all IPs look the same; see TASKS.md #4).
+- Rate-limit login and invite endpoints **per account** as well as per IP (behind the relay all IPs look the same; see TASKS.md #2).
 - Send security headers: HSTS (only once the domain setup is stable), CSP, `X-Frame-Options: DENY`.
 
 ---
@@ -365,7 +365,7 @@ Your instinct is right, with one correction: the cloud should **establish identi
 
 1. **Phase 1 — local multi-user (Solution A), in this repo.**
    - ✔ Done: users in SQLite, `Admin`/`Member` roles with an `Admin` policy, first-run setup wizard (no more `Auth__Password`), one-time invite links, PBKDF2 hashing, persisted Data Protection keys, per-request account check (removal and role changes apply at once).
-   - Next, small: security stamp so password changes revoke other sessions (TASKS.md #10); setup code for the wizard (2.2); per-account login limit and real client IPs behind a proxy (TASKS.md #4).
+   - Next, small: security stamp so password changes revoke other sessions (TASKS.md #8); setup code for the wizard (2.2); per-account login limit and real client IPs behind a proxy (TASKS.md #2).
    - Next, larger: `credentials` table and `owner`/`viewer` roles (2.1), server-side sessions with idle + absolute expiry, `__Host-` cookie, break-glass CLI, audit log.
    - Single origin (2.3).
 

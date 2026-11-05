@@ -47,4 +47,13 @@ public sealed class SystemMetricsRepository : ISystemMetricsRepository
             .Where(m => m.CollectedAtUtc < cutoffUtc)
             .ExecuteDeleteAsync(ct);
     }
+
+    public async Task<int> DeleteExceedingCountAsync(int maxStoredSamples, CancellationToken ct = default)
+    {
+        return await _dbContext.SystemMetrics
+            .OrderByDescending(m => m.CollectedAtUtc)
+            .ThenByDescending(m => m.Id)
+            .Skip(maxStoredSamples)
+            .ExecuteDeleteAsync(ct);
+    }
 }
