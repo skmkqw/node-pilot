@@ -11,4 +11,6 @@ public interface ISystemMetricsRepository
     Task SaveAsync(SystemMetric systemMetric, CancellationToken ct = default);
 
     Task<int> DeleteOlderThanAsync(DateTime cutoffUtc, CancellationToken ct = default);
+
+    Task<int> DeleteExceedingCountAsync(int maxStoredSamples, CancellationToken ct = default);
 }
