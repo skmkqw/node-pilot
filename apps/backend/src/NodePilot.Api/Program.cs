@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using NodePilot.Api;
 using NodePilot.Api.HealthChecks;
+using NodePilot.Api.ReverseProxy;
 using NodePilot.Application;
 using NodePilot.Infrastructure;
 using NodePilot.Infrastructure.Persistence;
@@ -17,6 +18,8 @@ builder.Services
     .AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
+
+app.UseReverseProxySupport();
 
 app.UseCors("WebClient");
 

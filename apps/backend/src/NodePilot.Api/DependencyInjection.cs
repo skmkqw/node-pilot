@@ -3,6 +3,7 @@ using NodePilot.Api.Auth;
 using NodePilot.Api.Cors;
 using NodePilot.Api.Files;
 using NodePilot.Api.HealthChecks;
+using NodePilot.Api.ReverseProxy;
 
 namespace NodePilot.Api;
 
@@ -15,6 +16,7 @@ public static class DependencyInjection
             opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
         });
 
+        services.AddReverseProxySupport(configuration);
         services.AddCookieAuthentication(configuration);
         services.AddLoginRateLimiting();
         services.AddUploadLimits();
