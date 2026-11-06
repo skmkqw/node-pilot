@@ -4,5 +4,6 @@ public sealed record RetentionResult(
     DateTime StartedAtUtc,
     DateTime CompletedAtUtc,
     DateTime CutoffUtc,
-    int DeletedMetrics
+    int AgeBasedDeletedMetrics,
+    int AmountBasedDeletedMetrics
 );

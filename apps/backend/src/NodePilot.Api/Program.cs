@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using NodePilot.Api;
 using NodePilot.Api.HealthChecks;
+using NodePilot.Api.ReverseProxy;
 using NodePilot.Application;
 using NodePilot.Infrastructure;
 using NodePilot.Infrastructure.Persistence;
@@ -18,6 +19,8 @@ builder.Services
 
 var app = builder.Build();
 
+app.UseReverseProxySupport();
+
 app.UseCors("WebClient");
 
 app.UseAuthentication();
@@ -26,6 +29,18 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
+
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = c => c.Tags.Contains("ready"),
+    ResponseWriter = HealthCheckResponseWriter.WriteAsync,
+}).AllowAnonymous();
+
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false,
+    ResponseWriter = HealthCheckResponseWriter.WriteAsync,
+}).AllowAnonymous();
 
 app.MapHealthChecks("/health", new HealthCheckOptions
 {

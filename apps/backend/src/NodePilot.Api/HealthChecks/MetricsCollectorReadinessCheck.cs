@@ -39,6 +39,21 @@ public sealed class MetricsCollectorReadinessCheck : IHealthCheck
             ["maxSnapshotAgeSeconds"] = maxSnapshotAge.TotalSeconds
         };
 
+        var collection = _monitoringSettingsProvider.Current.Collection;
+        data["enabled"] = collection.Enabled;
+
+        if (!collection.Enabled)
+        {
+            return Task.FromResult(
+                HealthCheckResult.Healthy("Metrics collection is disabled.", data: data));
+        }
+
+        if (!OperatingSystem.IsLinux())
+        {
+            return Task.FromResult(
+                HealthCheckResult.Degraded("Metrics collection is not supported on this operating system.", data: data));
+        }
+
         if (!snapshot.IsRunning)
         {
             return Task.FromResult(

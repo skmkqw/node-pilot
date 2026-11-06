@@ -8,7 +8,11 @@ public class InvitationConfiguration : IEntityTypeConfiguration<Invitation>
 {
     public void Configure(EntityTypeBuilder<Invitation> builder)
     {
-        builder.ToTable("invitations");
+        builder.ToTable("invitations", table =>
+        {
+            table.HasCheckConstraint("ck_invitations_role", "role IN ('Admin', 'Member')");
+            table.HasCheckConstraint("ck_invitations_expires_after_created", "expires_at_utc > created_at_utc");
+        });
 
         builder.HasKey(x => x.Id);
 
@@ -32,8 +36,6 @@ public class InvitationConfiguration : IEntityTypeConfiguration<Invitation>
             .HasConversion<string>()
             .HasMaxLength(16)
             .IsRequired();
-
-        builder.HasCheckConstraint("ck_invitations_role", "role IN ('Admin', 'Member')");
 
         // Removing a user also revokes the links they created.
         builder.Property(x => x.CreatedByUserId)
@@ -60,7 +62,5 @@ public class InvitationConfiguration : IEntityTypeConfiguration<Invitation>
             .HasConversion(
                 value => value,
                 value => value.HasValue ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc) : null);
-
-        builder.HasCheckConstraint("ck_invitations_expires_after_created", "expires_at_utc > created_at_utc");
     }
 }

@@ -1,10 +1,19 @@
 # Multi-user authentication for a distributed NodePilot
 
-Status: proposal / analysis · 2026-11-04
+Status: proposal / analysis · 2026-11-04 (updated after merging local users, roles and invite links from `main`)
 
 ## 1. The problem
 
-Today NodePilot has **one administrator per installation**. The username and password come from `.env` (`AuthSettings`). After login, the server issues an encrypted, self-contained cookie (`nodepilot.session`). That works for "my own server in my own flat".
+Today NodePilot has **local accounts per installation**, stored in SQLite (`users` table):
+
+- The first administrator is created in a **first-start setup wizard**, with no credentials in `.env` any more.
+- Further people join through **one-time invite links** (256-bit token, only its SHA-256 hash stored, 1 h–7 days, single use).
+- There are two roles, **Admin** and **Member**. An `Admin` authorization policy protects users, invitations and service settings.
+- Passwords are hashed with ASP.NET Core Identity's PBKDF2 (format v3).
+- After login, the server issues an encrypted, self-contained cookie (`nodepilot.session`). Its Data Protection keys are persisted in `data/keys`.
+- On every request the cookie handler re-loads the account, so a removed user is signed out at once and a role change applies immediately.
+
+That works for "my own server in my own flat, shared with my family". It is essentially Solution A below, partly built.
 
 Once NodePilot is distributed, there will be thousands of installations, each with an owner and maybe a few family members. Your question actually contains **three separate problems**. It helps to keep them apart, because they have different solutions:
 
@@ -29,7 +38,7 @@ If the cloud alone decides who gets into which server, then **one bug or one bre
 | T3. Server impersonation | An attacker registers a fake server under Alice's server ID, or hijacks its domain, and collects her credentials or files. |
 | T4. Cloud compromise | The cloud database leaks, or an insider or bug mints tokens. |
 | T5. Relay eavesdropping | Traffic forwarded through the cloud is readable by the cloud. |
-| T6. Revocation gaps | A removed family member or a stolen phone keeps access because sessions are self-contained (true today: logout doesn't revoke). |
+| T6. Revocation gaps | A stolen phone keeps access because sessions are self-contained. Partly true today: removing a user revokes their sessions at once, but logout and a password change don't revoke anything (see TASKS.md #8). |
 | T7. Classic web issues | CSRF, open redirects in the login flow, session fixation, credential stuffing. |
 | T8. Cloud outage | The cloud is down and nobody can get into their own server, even at home. |
 
@@ -39,38 +48,53 @@ If the cloud alone decides who gets into which server, then **one bug or one bre
 
 These are needed whichever option you pick, and they are also the first steps you can take in the current codebase.
 
-### 2.1 Local user and membership model (replaces `AuthSettings`)
+### 2.1 Local user and membership model
 
-New SQLite tables:
+**What exists today** (migrations `AddAccountsAndSettings`, `AddRolesAndInvitations`):
 
 ```text
-users        (id, display_name, created_at, disabled_at)
+users        (id, username [unique, NOCASE], password_hash [Identity v3], role [Admin|Member],
+              created_at_utc, password_changed_at_utc)
+invitations  (id, token_hash [unique], role, created_by_user_id → users ON DELETE CASCADE,
+              created_at_utc, expires_at_utc, accepted_at_utc)
+app_settings (key, value, updated_at_utc)       ← Pi-hole URL + Data Protection-encrypted password
+```
+
+**Target model.** Evolve the tables above towards this, instead of starting over:
+
+```text
+users        (id, username, display_name, created_at, disabled_at)
 credentials  (id, user_id, type[password|passkey|external], data, created_at, last_used_at)
-               - password:  PHC string (Argon2id, or ASP.NET Identity PasswordHasher v3)
+               - password:  PHC string (today's users.password_hash moves here)
                - passkey:   credential id, public key, sign counter, transports
                - external:  issuer + subject   ← link to a cloud identity (Option B)
 memberships  (user_id, role[owner|admin|member|viewer], granted_by, granted_at)
 sessions     (id_hash, user_id, created_at, last_seen_at, expires_at, ip, user_agent, revoked_at)
-invites      (token_hash, role, created_by, expires_at, used_by, used_at)
+invitations  (as today, plus accepted_by_user_id)
 audit_log    (at, user_id, action, details)
 ```
 
+- **Separate credentials from users.** Today the password hash is a column on `users`. A user with only a passkey or only a cloud identity needs `credentials` as its own table.
+- **Roles:** today's `Admin`/`Member` map to `admin`/`member`. An explicit `owner` (the one who can't be removed by other admins, and who does pairing) and a read-only `viewer` are the missing ones. Today "you can't remove or demote yourself" is the only guarantee that an admin remains.
 - **Server-side sessions** replace the self-contained cookie. The cookie holds only a random 256-bit ID, and the DB stores just its SHA-256 hash. Deleting a row logs that device out immediately (fixes T6). In ASP.NET Core this is a custom `ITicketStore` on the cookie handler, or a small custom scheme.
 - The cookie should be `__Host-nodepilot`: `Secure`, `HttpOnly`, `SameSite=Lax`, `Path=/`, no `Domain`. The `__Host-` prefix stops sibling subdomains from setting or overwriting it, which matters once servers share a parent domain (see 2.4).
-- **Roles become authorization policies** on controllers. For example `[Authorize(Policy = "CanModifyFiles")]` on upload and delete, `"CanControlAdBlock"` on `POST /api/adblock/blocking`, and read endpoints for every member.
+  Until then, the cheap intermediate step is a security stamp in the cookie that `ValidateAccountAsync` (which already runs per request) compares with the database. That gives "password change / log out all devices revokes everything" without a sessions table (TASKS.md #8).
+- **Roles become authorization policies** on controllers. One exists today: `Admin` on `UsersController`, `InvitationsController` and `SettingsController`. Everything else is open to any signed-in user. Next: `[Authorize(Policy = "CanModifyFiles")]` on upload and delete, `"CanControlAdBlock"` on `POST /api/adblock/blocking`, and read endpoints for every member, which is what a `viewer` role needs.
 - Identify external identities by **`(issuer, subject)`, never by email.** Emails change and get reused by new accounts at some providers. Matching by email is a classic account takeover bug.
 
-### 2.2 First-run setup instead of a password in `.env`
+### 2.2 First-run setup: add a setup code
 
-On first start, while there are no users, the backend:
+**Today:** while the `users` table is empty, `POST /api/auth/setup` creates the administrator for **whoever calls it first**. It is rate limited and race-safe (a semaphore plus a re-check), but it is not tied to the machine. Anyone on the LAN, or on the internet if the port is exposed, who opens the page before the owner does becomes the admin. The README only says "do the setup right after installing". This is T2 in a local form.
 
-1. generates a random **setup code** (e.g. 10 base32 characters, ~50 bits) and prints it to the service log / journal (`journalctl -u nodepilot-backend`);
-2. serves a setup page that **only accepts requests from loopback or private network addresses** (the logic in `OriginPolicy` already exists) and only while no owner exists;
-3. requires the setup code plus the new owner's credentials, then deletes the code.
+**Proposal:** keep the existing wizard, and add to it. On first start, while there are no users, the backend:
+
+1. generates a random **setup code** (e.g. 10 base32 characters, ~50 bits) and prints it to the service log / journal (`journalctl -u nodepilot-backend`, `docker compose logs backend`);
+2. accepts `POST /api/auth/setup` **only from loopback or private network addresses** (the logic in `OriginPolicy` already exists) and only while no owner exists;
+3. requires the setup code plus the new owner's credentials, then deletes the code. The wizard gets one more field.
 
 Why this matters: proving you can read the server's local log is proof of physical or admin control of the machine. This "proof of possession of the box" pattern is reused for cloud pairing below.
 
-There should also be a **break-glass CLI**, e.g. `NodePilot.Api reset-owner`, run on the machine itself. It resets the owner if all credentials are lost. Anyone with a shell on the box owns it anyway, so this doesn't weaken security.
+There should also be a **break-glass CLI**, e.g. `NodePilot.Api reset-owner`, run on the machine itself. It resets the owner if all credentials are lost. Anyone with a shell on the box owns it anyway, so this doesn't weaken security. Today the documented recovery is deleting `nodepilot.db`, which also throws away metric history, other accounts and settings.
 
 ### 2.3 One origin per server
 
@@ -111,16 +135,16 @@ flowchart LR
   R[Phone outside] -->|"user's own VPN<br/>(WireGuard / Tailscale)"| S
 ```
 
-**How it works**
-- Owner created by first-run setup (2.2).
-- The owner invites family members from the UI. An invite is a one-time link (`/invite/<token>`) with a random 256-bit token, stored hashed, valid 24–72 h, single use. The invitee opens it on the LAN and sets a password or registers a passkey.
-- Login: password (Argon2id, rate limited **per account and per IP**) with optional TOTP, or a passkey.
+**How it works** (✔ = already implemented)
+- ✔ Owner created by first-run setup (2.2). Missing: the setup code.
+- ✔ The owner invites family members from the UI. An invite is a one-time link (`/invite/<token>`) with a random 256-bit token, stored hashed, valid 1 h–7 days, single use. The invitee opens it and sets a password. Missing: registering a passkey instead.
+- ✔ Login with a password, PBKDF2 (Identity v3), rate limited per IP. Missing: a per-account limit, optional TOTP, passkeys.
 
 **Pros**
 - Smallest attack surface; there is nothing central to breach (T4 doesn't exist).
 - Works offline (T8).
 - No running costs, no GDPR obligations for you as a vendor.
-- Fits the current code best.
+- Mostly built already.
 
 **Cons**
 - Each server has separate accounts, with no single login across several servers.
@@ -128,7 +152,7 @@ flowchart LR
 - Passkeys need a domain and HTTPS (2.4). Without a cloud helper, the user has to set that up themselves.
 - Account recovery is local only (break-glass CLI).
 
-**Verdict:** build this **first, regardless of the final choice**. Options B and C extend it; they don't replace it.
+**Verdict:** finish this **first, regardless of the final choice**. Options B and C extend it; they don't replace it.
 
 ---
 
@@ -237,11 +261,11 @@ After this, NodePilot uses its own server-side session (2.1). Normal API calls n
 
 ### 4.4 Inviting other people
 
-1. The owner clicks *Invite* in the local UI and picks a role. The **server** creates the invite (random token, hashed in the `invites` table, role, 72 h expiry, single use).
+1. The owner clicks *Create invite link* in the local UI and picks a role. The **server** creates the invite exactly as it does today (random token, hashed in the `invitations` table, role, 1 h–7 days expiry, single use).
 2. The link `https://7f3c….nodepilot.app/invite/<token>` is shared by any channel. The cloud may send the email, but it never sees or decides the role.
 3. The invitee opens it and logs in via the cloud (4.3). The callback sees the pending invite in the encrypted state and creates a membership for the returned `(iss, sub)`.
 4. Bind to the **token, not to the email address** the invite was sent to. If you want, also require `email_verified=true` and a matching email as an additional check, never as the only one.
-5. Removing someone: delete the membership and all their sessions in one transaction. It takes effect immediately.
+5. Removing someone: delete the membership and all their sessions in one transaction. It takes effect immediately, as it already does today through the per-request account check.
 
 ### 4.5 Revocation and lifetimes
 
@@ -316,7 +340,7 @@ Recommended: start with **R1** (document Tailscale) and LAN access via the per-s
 
 Extra checks on the server once it is reachable from outside:
 - Validate the `Host` header against its own hostname(s): `AllowedHosts` in `appsettings.json` is currently `*`. This protects against DNS rebinding.
-- Rate-limit login and invite endpoints **per account** as well as per IP (behind the relay all IPs look the same; see TASKS.md #4).
+- Rate-limit login and invite endpoints **per account** as well as per IP (behind the relay all IPs look the same; see TASKS.md #2).
 - Send security headers: HSTS (only once the domain setup is stable), CSP, `X-Frame-Options: DENY`.
 
 ---
@@ -339,12 +363,13 @@ Extra checks on the server once it is reachable from outside:
 
 Your instinct is right, with one correction: the cloud should **establish identity and help with connectivity**, but **access decisions stay on the home server**. Concretely:
 
-1. **Phase 1 — local multi-user (Solution A), in this repo now.**
-   - Users, memberships, roles, server-side sessions, `__Host-` cookie.
-   - First-run setup code instead of `Auth__Password`; invites; break-glass CLI.
+1. **Phase 1 — local multi-user (Solution A), in this repo.**
+   - ✔ Done: users in SQLite, `Admin`/`Member` roles with an `Admin` policy, first-run setup wizard (no more `Auth__Password`), one-time invite links, PBKDF2 hashing, persisted Data Protection keys, per-request account check (removal and role changes apply at once).
+   - Next, small: security stamp so password changes revoke other sessions (TASKS.md #8); setup code for the wizard (2.2); per-account login limit and real client IPs behind a proxy (TASKS.md #2).
+   - Next, larger: `credentials` table and `owner`/`viewer` roles (2.1), server-side sessions with idle + absolute expiry, `__Host-` cookie, break-glass CLI, audit log.
    - Single origin (2.3).
 
-   This is useful on its own, it is required by every later phase, and it fixes the revocation and sliding-session limitations in `authentication.md`.
+   This is useful on its own, it is required by every later phase, and it fixes the revocation and sliding-session limitations in `documents/features/authentication.md`.
 2. **Phase 2 — cloud registry + pairing + domain/certificate.**
    - Server identity key; device-flow claim (4.2); per-server domain with LAN DNS and DNS-01 certificates (2.4).
    - With HTTPS on a real domain, add **passkeys on the server** (Solution C login).

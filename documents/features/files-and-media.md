@@ -26,6 +26,7 @@ A browser-based file manager restricted to one folder on the server (`FileManage
 ### Limitations
 
 - **One root folder only.** Nothing outside `RootPath` can be reached. Symlinks that point outside are hidden from listings and return `403`.
+- **No per-user permissions.** Every signed-in user, *Member*s included, sees the same root and can upload, create folders and delete anything in it. There are no private folders and no read-only access.
 - **No rename, move, copy or multi-select.** There is also no search across subfolders, and no zip download of a folder.
 - **Delete is permanent.** There is no trash or undo, and deleting a folder removes everything inside it.
 - **No transcoding.** MKV, AVI and WMV are recognized as video but are **not playable** in the browser, so you can only download them. MOV and HEVC/H.265 playback depends on the browser. Safari handles more formats than Chrome or Firefox.
@@ -69,8 +70,9 @@ FilesController (/api/files)
 - **Name rules** (`SafePathResolver.IsValidName`): non-empty, ≤ 255 characters, no leading or trailing whitespace, no leading `.`, no `/` `\` NUL, and no OS-invalid characters.
 - **Upload size limits** are raised in `UploadLimitsExtensions`: Kestrel's `MaxRequestBodySize` (default 30 MB) and `FormOptions.MultipartBodyLengthLimit` (default 128 MB). The Kestrel limit is **global**, so every endpoint accepts bodies up to that size. A reverse proxy in front needs its own limit, for example nginx `client_max_body_size`, which defaults to 1 MB.
 - **Multipart buffering:** `Request.ReadFormAsync` buffers files larger than 64 KB to a temporary file before `SaveAsync` copies them. The temp directory therefore needs free space for the largest upload, and each upload is written to disk twice.
-- **Inline content is served from the API origin.** An uploaded `.html` or `.svg` file opened with `/content` is rendered by the browser on the API's origin. Only the authenticated admin can upload, so the risk is low, but `download=true` or a `Content-Security-Policy: sandbox` header would remove it.
-- **TOCTOU.** The checks run before each operation, so a symlink swapped between the check and the use is not detected. That is acceptable for a single-admin setup where the admin controls the filesystem.
+- **Inline content is served from the API origin.** An uploaded `.html` or `.svg` file opened with `/content` is rendered by the browser on the API's origin. Any signed-in user can upload, so one household member could plant a page that runs with another member's session when opened inline. `download=true` or a `Content-Security-Policy: sandbox` header would remove the risk.
+- **TOCTOU.** The checks run before each operation, so a symlink swapped between the check and the use is not detected. That is acceptable because NodePilot users cannot create symlinks; only someone with shell access to the server can.
+- **Authorization:** `FilesController` has no role restriction; the global fallback policy (any signed-in user) applies.
 - **Access errors.** `UnauthorizedAccessException` is mapped to `403 Files.AccessDenied`. This usually means the backend process lacks filesystem permissions on the mounted folder.
 - **Web client:**
   - Uploads use `XMLHttpRequest` because `fetch` cannot report upload progress, with `withCredentials` set so the cookie is sent.
