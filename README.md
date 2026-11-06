@@ -195,7 +195,8 @@ Optional environment variables (see `.env.example`):
 | `NODEPILOT_FILES_DIR` | Host folder shown in the file manager (Docker Compose) | `./data/files` |
 | `BACKEND_PORT` / `WEB_PORT` | Published ports | `5000` / `3000` |
 | `NODE_PILOT_DB_CONNECTION_STRING` | Custom SQLite location | `Data Source=data/nodepilot.db` |
-| `NEXT_PUBLIC_API_URL` | Backend URL for the browser, if not `<host>:5000` | empty |
+| `NEXT_PUBLIC_API_URL` | Backend URL for the browser, if not `<host>:5000`; `/` behind a reverse proxy | empty |
+| `ReverseProxy__Enabled` | Trust `X-Forwarded-*` headers from `ReverseProxy:KnownProxies` ([Behind nginx](#behind-nginx-https-one-address)) | `false` |
 | `PiHole__BaseUrl` / `PiHole__Password` | Pre-configure Pi-hole for automated deployments (settings saved in the app take precedence) | empty |
 
 Advanced settings live in `apps/backend/src/NodePilot.Api/appsettings.json`: monitoring intervals and retention, `FileManager:RootPath` / `MaxUploadMegabytes`, CORS, and `Auth:SessionLifetimeHours` / `LoginAttemptsPerMinute`.
@@ -231,6 +232,35 @@ npm install
 npm run dev
 ```
 
+## Behind nginx (HTTPS, one address)
+
+By default the browser talks to two ports (`3000` and `5000`) over plain HTTP. With nginx on the host in front of both, the panel is reachable at one HTTPS address, e.g. `https://nodepilot.home`: `/api/` and `/health` go to the backend, everything else goes to the web app.
+
+```bash
+sudo apt install nginx                       # optionally also mkcert, for a certificate without browser warnings
+sudo deploy/nginx/make-cert.sh               # writes /etc/nginx/ssl/nodepilot.{crt,key}
+sudo cp deploy/nginx/nodepilot.conf /etc/nginx/sites-available/nodepilot
+sudo ln -s /etc/nginx/sites-available/nodepilot /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+echo "<server-ip> nodepilot.home" | sudo tee -a /etc/hosts   # on each client, or add it to the router's DNS
+```
+
+Then start NodePilot in proxy mode:
+
+```bash
+# backend: trust X-Forwarded-For / X-Forwarded-Proto from nginx (127.0.0.1)
+cd apps/backend/src/NodePilot.Api
+ReverseProxy__Enabled=true dotnet run
+
+# web app: call the API on the page's own address (baked in at build time)
+cd apps/web
+NEXT_PUBLIC_API_URL=/ npm run build && npm start
+```
+
+- **Why `ReverseProxy:Enabled`?** Every request now comes from nginx (`127.0.0.1`) over HTTP. Without it, all devices share one login rate limit, and the session cookie isn't marked `Secure`. The headers are only trusted from `ReverseProxy:KnownProxies` (default `127.0.0.1`, `::1`), so a client can't fake its IP. If the backend runs in Docker, connections come from the Docker bridge instead. Add e.g. `ReverseProxy__KnownNetworks__0=172.16.0.0/12`.
+- **Close the direct ports** (`3000`, `5000`) in the firewall, or bind them to `127.0.0.1`, so everyone goes through nginx.
+- **Uploads:** `client_max_body_size` in `nodepilot.conf` must be at least `FileManager:MaxUploadMegabytes`.
+
 ## Tests
 
 ```bash
@@ -254,7 +284,7 @@ npm run build
 - Sessions use an HTTP-only, `SameSite=Lax` cookie; login is limited to 5 attempts per minute per IP.
 - The file manager is restricted to `FileManager:RootPath`. Paths are normalised and every symlink along a path is resolved, so `..` sequences and links pointing outside the root are rejected (403).
 - NodePilot does not execute shell commands.
-- For access from outside the home network, put it behind a VPN or a reverse proxy with HTTPS.
+- For HTTPS on one address, see [Behind nginx](#behind-nginx-https-one-address). For access from outside the home network, use a VPN.
 
 ## Documentation
 

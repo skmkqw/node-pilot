@@ -21,8 +21,8 @@ The Next.js 16 / React 19 single-page client that hosts all the features, plus t
 
 ### Limitations
 
-- **Two ports must be reachable:** `3000` for the web app and `5000` for the API. The browser talks to the API directly, and there is no proxy through Next.js. Firewalls must allow both ports.
-- **No HTTPS out of the box.** For TLS or a single hostname, put both services behind a reverse proxy and set `NEXT_PUBLIC_API_URL` accordingly. Note that changing the variable requires a rebuild of the web app (see below).
+- **Two ports must be reachable without a proxy:** `3000` for the web app and `5000` for the API. The browser talks to the API directly, and there is no proxy through Next.js. Firewalls must allow both ports.
+- **No HTTPS without a proxy.** For TLS and a single hostname, use the nginx setup in the README (`deploy/nginx/`), build the web app with `NEXT_PUBLIC_API_URL=/` and start the backend with `ReverseProxy__Enabled=true`. Changing the variable requires a rebuild of the web app (see below).
 - **One theme only** (light, no dark mode). English only, with times and dates in the browser's locale.
 - **No offline support.** Without the backend, the UI shows its error states.
 - **`./start.sh` runs the development servers** (`dotnet run`, `npm run dev`). It is meant for trying NodePilot out, not for leaving it running on the server; use Docker Compose for that.
@@ -40,6 +40,7 @@ Browser ──► web :3000 (Next.js standalone, all pages are client components
 
 - **API base URL** (`lib/api/client.ts`, `getApiBaseUrl`):
   - It is `NEXT_PUBLIC_API_URL` if set.
+  - `/` means "same origin as the page" (`location.origin`), for a reverse proxy that serves `/api/` on the web app's address. It is a special value rather than a relative URL, because `apiUrl` builds an absolute `URL`.
   - Otherwise it is `${location.protocol}//${location.hostname}:5000`. That is what makes the same build work from `localhost`, `192.168.x.x` or `server.local`.
 - **`request<T>()`** wraps `fetch` with `credentials: "include"`, `cache: "no-store"`, JSON bodies and abort signals. Errors become an `ApiError(message, status)`:
   - The message is taken from ProblemDetails: the first validation error, then `title`, then a generic text.
@@ -92,7 +93,7 @@ No configuration is required. Optional variables (see `.env.example`):
 
 | Variable | Default | Effect |
 |---|---|---|
-| `NEXT_PUBLIC_API_URL` | empty | The backend URL used by the browser. Empty means the same host on port 5000. Build time only |
+| `NEXT_PUBLIC_API_URL` | empty | The backend URL used by the browser. Empty means the same host on port 5000, `/` means the page's own origin (reverse proxy). Build time only |
 | `WEB_PORT` / `BACKEND_PORT` | `3000` / `5000` | Published ports (Docker Compose) |
 | `NODEPILOT_FILES_DIR` | `./data/files` | Host folder mounted as the file root (Docker Compose) |
 | `ASPNETCORE_ENVIRONMENT` | `Production` (compose) | `Development` loads `appsettings.Development.json` (shorter metric retention) |

@@ -1,6 +1,6 @@
 # NodePilot REST API
 
-Base URL: `http://<server>:5000`. All responses are JSON and enums are serialized as strings. Errors use [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) (`title`, `status`, and `errors` for validation failures).
+Base URL: `http://<server>:5000`, or `https://<host>` behind the nginx setup from the README (the API keeps its `/api/...` paths). With `ReverseProxy:Enabled`, the client IP used for the login rate limit comes from `X-Forwarded-For`, but only on connections from `ReverseProxy:KnownProxies`. All responses are JSON and enums are serialized as strings. Errors use [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) (`title`, `status`, and `errors` for validation failures).
 
 Every endpoint except the `/health` endpoints, `GET /api/auth/status`, `POST /api/auth/setup`, `POST /api/auth/login` and the two `/api/invite/{token}` endpoints requires the session cookie `nodepilot.session`. Without it, the API answers **401**. Endpoints marked *admin* answer **403** to members.
 
