@@ -37,9 +37,9 @@ Local user accounts stored in SQLite protect the panel. The first administrator 
 - **An open dashboard keeps the session alive.** The dashboard polls every few seconds and the session uses sliding expiration, so a tab left open never expires.
 - **Forgotten password.** There is no reset flow. Another admin can remove the account and send a new invite. If the only admin forgets the password, the database has to be deleted (see the README), which also removes metric history and settings.
 - **Deleting `data/keys` signs everyone out.** The cookie encryption keys live in `data/keys` next to the database. Deleting that folder invalidates all sessions and also the stored Pi-hole password.
-- **There is no HTTPS of its own.** The cookie is marked `Secure` only when the request uses HTTPS. On plain HTTP in the LAN, anyone who can see the traffic can read the password and the cookie.
+- **There is no HTTPS of its own.** The cookie is marked `Secure` only when the request uses HTTPS. On plain HTTP in the LAN, anyone who can see the traffic can read the password and the cookie. Use the nginx setup in the README for HTTPS.
 - **No 2FA and no lockout.** The rate limit slows down guessing but never locks the account.
-- **The rate limit is per IP and in memory.** Behind a reverse proxy, all clients share the proxy's IP, so one user's failed attempts can block everyone. The counters reset when the backend restarts.
+- **The rate limit is per IP and in memory.** The counters reset when the backend restarts. Behind a reverse proxy, `ReverseProxy:Enabled` must be on; otherwise all clients share the proxy's IP, and one user's failed attempts block everyone.
 
 ## Developer perspective
 
@@ -76,7 +76,12 @@ Browser ── any /api/* with cookie ──► cookie handler
 - **`password_changed_at_utc` is stored but not used** for session invalidation yet. Comparing it with the cookie's issue time in `ValidateAccountAsync` would end other sessions after a password change.
 - **Same-site requirement.** The web app (`:3000`) and the API (`:5000`) on the same host are *same-site*, so the `Lax` cookie is sent with `fetch(..., { credentials: "include" })`. If `NEXT_PUBLIC_API_URL` uses a different host than the page (for example the page is opened as `nas.local` but the API URL is `192.168.1.2`), the requests become cross-site and the cookie is **not sent**: sign-in appears to succeed, but every following call returns `401`.
 - **Other apps on the same LAN host can call the API.** A web app served from another port on the same IP is same-site and matches the private-network CORS rule, so it can make credentialed requests to this API. If you host untrusted web apps on the same machine, turn off `AllowPrivateNetworkOrigins` and list origins explicitly.
-- **Rate limiter behind a proxy:** forwarded headers are not configured. To get the real client IP, add `UseForwardedHeaders` with known proxies.
+- **Behind a reverse proxy** (`ReverseProxy/ForwardedHeadersExtensions.cs`): with `ReverseProxy:Enabled`, `UseForwardedHeaders` runs first in the pipeline. It replaces `RemoteIpAddress` with `X-Forwarded-For` and `Request.Scheme` with `X-Forwarded-Proto`, so the rate limiter partitions by the real client and `SameAsRequest` marks the cookie `Secure` on HTTPS.
+  - The headers are honoured **only when the connection comes from `KnownProxies` / `KnownNetworks`** (default `127.0.0.1`, `::1`). The framework's loopback defaults are cleared, so the config is the whole list. Otherwise any client could send its own `X-Forwarded-For` and get unlimited login attempts.
+  - `ForwardLimit = 1`: only the last hop is used. nginx overwrites the header with `$remote_addr` instead of appending, so a forged value from the client never reaches the backend.
+  - Invalid entries stop the startup (`ValidateOnStart`), so a typo doesn't silently trust nobody.
+  - A backend in Docker behind host nginx sees the bridge gateway (`172.x.0.1`), not loopback. Add the network to `KnownNetworks`.
+  - Behind the proxy the web app and API share one origin (`NEXT_PUBLIC_API_URL=/`), so CORS doesn't apply to the panel's requests.
 - **Web client:**
   - `AuthProvider` calls `GET /api/auth/status` once when the app loads and maps it to `setup`, `anonymous`, `authenticated` or `offline` (backend unreachable). `isAdmin` is derived from the role.
   - The `(app)` layout redirects `setup` → `/setup` and `anonymous` → `/login?next=…`, and shows `OfflineScreen` with a retry button when offline.

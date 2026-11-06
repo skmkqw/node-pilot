@@ -14,6 +14,8 @@
 
 ---
 
+2(nginx) 1 6 9 8 7 4 5 3
+
 ## 1. Store session encryption keys in a known place: done, small leftovers (10 min)
 
 **Done on `main`.** `AddInfrastructure` now calls `AddDataProtection().SetApplicationName("NodePilot").PersistKeysToFileSystem(<data dir>/keys)`, where the data dir is the folder of the SQLite database (`DatabaseExtensions.ResolveDataDirectory`). The same key ring also encrypts the Pi-hole password stored in `app_settings`. In Docker the folder is on the `nodepilot-data` volume, and the README and `authentication.md` already say to back up `data/` as a whole.
