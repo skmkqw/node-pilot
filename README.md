@@ -53,7 +53,7 @@ The script checks the requirements, installs dependencies on the first run, buil
   This computer:     http://localhost:3000
   Phone (Wi-Fi):     http://192.168.1.20:3000   (same network)
   Phone (USB cable): ...
-  Stop:              Ctrl+C
+  Stop:              Ctrl+C here, or ./stop.sh from any terminal
 ```
 
 On the first visit NodePilot shows a **setup screen**: create the administrator account, optionally connect Pi-hole, done. No configuration files are needed.
@@ -63,6 +63,7 @@ On the first visit NodePilot shows a **setup screen**: create the administrator 
 | `./start.sh` | Normal start |
 | `./start.sh --clean` | The page keeps reloading or looks outdated (clears the Next.js cache) |
 | `./start.sh --install` | After pulling changes that added web packages |
+| `./stop.sh` | Stop NodePilot from any terminal (same as Ctrl+C in the one running it) |
 
 ### Opening it on a phone
 
@@ -81,7 +82,7 @@ NodePilot is a client–server application: the **backend** (ASP.NET Core, port 
 
 | Problem | Fix |
 |---|---|
-| `Port 5000/3000 is already in use` | NodePilot (or something else) is already running; stop it first. |
+| `Port 5000/3000 is already in use` | NodePilot is already running: `./stop.sh`, then start again. If `stop.sh` says another program uses the port, close that program. |
 | `.NET SDK 10 is required` | Install it from <https://dotnet.microsoft.com/download/dotnet/10.0>. |
 | `Node.js 20.9 or newer is required` | `nvm install 22` |
 | Page stuck on "Connecting…" or reloading in a loop | `./start.sh --clean` |
@@ -161,6 +162,7 @@ nodepilot/
 │  └─ web/                     # Next.js 16 / React 19 client (Tailwind 4, Motion)
 ├─ documents/                  # API reference, metrics notes, mockups, Postman
 ├─ start.sh                   # one-command local start (see Quick start)
+├─ stop.sh                    # stops it from any terminal
 ├─ compose.yaml
 └─ .env.example
 ```
