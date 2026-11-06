@@ -7,7 +7,7 @@
 #         ./start.sh --clean    also clear the Next.js cache first (fixes reload loops)
 #         ./start.sh --install  reinstall web dependencies first
 #
-# Press Ctrl+C once to stop both servers.
+# Press Ctrl+C once to stop both servers, or run ./stop.sh from another terminal.
 
 set -euo pipefail
 
@@ -67,7 +67,7 @@ fi
 
 for port in "$BACKEND_PORT" "$WEB_PORT"; do
 	if ss -ltn 2>/dev/null | grep -q ":$port "; then
-		fail "Port $port is already in use. Is NodePilot already running? Stop it first."
+		fail "Port $port is already in use. If NodePilot is already running, stop it with ./stop.sh."
 	fi
 done
 
@@ -134,7 +134,7 @@ else
 	echo "                     adb reverse tcp:$WEB_PORT tcp:$WEB_PORT && adb reverse tcp:$BACKEND_PORT tcp:$BACKEND_PORT"
 	echo "                     and open http://localhost:$WEB_PORT on the phone"
 fi
-echo "  Stop:              Ctrl+C"
+echo "  Stop:              Ctrl+C here, or ./stop.sh from any terminal"
 printf '\033[1;33m%s\033[0m\n' "========================================================"
 echo
 
