@@ -16,9 +16,14 @@ export class ApiError extends Error {
 /**
  * Backend base URL. When NEXT_PUBLIC_API_URL is not set, the backend is assumed to run
  * on port 5000 of the same host, which makes the panel work from any device in the LAN.
+ * "/" means a reverse proxy serves the API under /api on the same address as the web app.
  */
 export function getApiBaseUrl(): string {
 	const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
+
+	if (configured === "/") {
+		return typeof window !== "undefined" ? window.location.origin : "http://localhost:5000";
+	}
 
 	if (configured) {
 		return configured.replace(/\/+$/, "");
